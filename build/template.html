@@ -1,0 +1,2835 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSP Reporting Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #ffffff;
+      --sur:        #f7f8fa;
+      --sur2:       #e8eaed;
+      --bdr:        #d1d5db;
+      --txt:        #1f2328;
+      --mut:        #57606a;
+      --blu:        #0f62fe;
+      --blu-40:     #1a56c4;
+      --blu-30:     #2563c8;
+      --grn:        #198038;
+      --red:        #da1e28;
+      --yel:        #b28600;
+      --pur:        #6929c4;
+      --teal:       #007d79;
+    }
+
+    html, body {
+      height: 100%; background: var(--bg); color: var(--txt);
+      font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px; line-height: 1.5;
+    }
+
+    /* ── Top-level tab bar ──────────────────────────────────────────────── */
+    #top-tabs {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--bg); border-bottom: 2px solid var(--bdr);
+      display: flex; gap: 0; padding: 0 20px;
+    }
+    .top-tab {
+      font-size: 13px; font-weight: 500; padding: 10px 20px;
+      cursor: pointer; color: var(--mut);
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+      background: none; border-top: none; border-left: none; border-right: none;
+      transition: color 0.1s;
+    }
+    .top-tab:hover { color: var(--txt); }
+    .top-tab.active { color: var(--blu-40); border-bottom-color: var(--blu); }
+
+    /* ── Main layout ────────────────────────────────────────────────────── */
+    #main { padding: 20px; max-width: 1600px; margin: 0 auto; }
+
+    /* ── Snapshot info bar ───────────────────────────────────────────────── */
+    #snap-bar {
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+      background: var(--sur); border: 1px solid var(--bdr);
+      border-radius: 4px; padding: 8px 16px; margin-bottom: 20px;
+    }
+    #snap-bar .filter-scope-note {
+      margin-left: auto; font-size: 10px; color: var(--mut);
+      line-height: 1.4; max-width: 160px; text-align: right;
+    }
+
+    /* ── KPI cards ──────────────────────────────────────────────────────── */
+    .kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .kpi-card {
+      background: var(--sur); border: 1px solid var(--bdr);
+      border-radius: 4px; padding: 16px 20px; min-width: 140px; flex: 1;
+    }
+    .kpi-card.accent { border-top: 2px solid var(--blu); }
+    .kpi-label { font-size: 11px; color: var(--mut); font-weight: 600;
+      letter-spacing: 0.01em; margin-bottom: 10px; line-height: 1.4; }
+    .kpi-value { font-size: 28px; font-weight: 300; line-height: 1; color: var(--blu-40); }
+    .kpi-delta { font-size: 11px; margin-top: 5px; }
+    .kpi-delta.pos { color: var(--grn); }
+    .kpi-delta.neg { color: var(--red); }
+    .kpi-delta.neu { color: var(--mut); }
+
+    /* ── Management Org Details table ────────────────────────────────────── */
+    .mgmt-table-wrap { overflow-x: auto; border: 1px solid var(--bdr); border-radius: 4px; margin-bottom: 20px; }
+    .mgmt-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; width: 100%; }
+    .mgmt-table thead th {
+      background: var(--sur2); color: var(--mut);
+      font-weight: 600; font-size: 11px;
+      padding: 8px 10px; border-right: 1px solid var(--bdr); border-bottom: 2px solid var(--bdr);
+      text-align: left; cursor: pointer; user-select: none; white-space: normal;
+    }
+    .mgmt-table thead th:hover { color: var(--txt); }
+    .mgmt-table thead th.asc::after  { content: ' ↑'; }
+    .mgmt-table thead th.desc::after { content: ' ↓'; }
+    .mgmt-table tbody tr { border-bottom: 1px solid var(--sur2); cursor: pointer; }
+    .mgmt-table tbody tr:hover { background: var(--sur2); }
+    .mgmt-table tbody td {
+      padding: 6px 10px; border-right: 1px solid var(--sur2);
+      max-width: 220px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+    }
+    .mgmt-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .util-bar-cell { min-width: 110px; }
+    .util-bar-wrap { display: flex; align-items: center; gap: 6px; }
+    .util-bar-bg { flex: 1; height: 6px; background: var(--sur2); border-radius: 3px; overflow: hidden; min-width: 50px; }
+    .util-bar-fill { height: 100%; border-radius: 3px; }
+    .util-bar-pct { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+    .status-badge {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 2px; white-space: nowrap;
+    }
+    .status-healthy   { background: rgba(25,128,56,.12);   color: #198038; }
+    .status-moderate  { background: rgba(178,134,0,.12);   color: #b28600; }
+    .status-at-risk   { background: rgba(218,30,40,.12);   color: #da1e28; }
+    .status-over-util { background: rgba(105,41,196,.12);  color: #6929c4; }
+    .status-low-util  { background: rgba(87,96,106,.12);   color: #57606a; }
+    .status-no-csum   { background: rgba(87,96,106,.08);   color: #57606a; }
+    .status-expired   { background: rgba(87,96,106,.12);   color: #57606a; }
+    .status-no-data   { background: rgba(87,96,106,.12);   color: #57606a; }
+    .status-early-stage { background: rgba(0,125,255,.10); color: #1a56c4; }
+    td.util-cell-early    { background: rgba(0,125,255,.10)   !important; }   /* Early Stage (annual, tenure ≤ 2 mo) blue */
+    /* Program Overview details table: ~20 rows visible, then scroll */
+    #po-mgmt-wrap { overflow-y: auto; max-height: 690px; }
+    #po-mgmt-wrap .mgmt-table thead th { position: sticky; top: 0; z-index: 2; }
+
+    /* ── Program Overview page header ───────────────────────────────────── */
+    #po-page-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--bdr);
+      flex-wrap: wrap; gap: 12px;
+    }
+    #po-page-header .po-logo-area { display: flex; align-items: center; gap: 16px; }
+    #po-page-header .po-logo-icon { display: flex; align-items: center; flex-shrink: 0; }
+    #po-page-header .po-title { font-size: 17px; font-weight: 600; color: var(--txt); line-height: 1.3; }
+    #po-page-header .po-subtitle { font-size: 12px; font-weight: 700; color: #ff832b; letter-spacing: 0.04em; margin-top: 3px; }
+    #po-page-header .po-refresh { font-size: 11px; color: var(--mut); text-align: right; line-height: 1.6; }
+
+    .po-fc { display: flex; flex-direction: column; gap: 3px; }
+    .po-fc label { font-size: 10px; color: var(--mut); font-weight: 500; white-space: nowrap; }
+    .po-fc select, .po-fc input[type=text] {
+      background: var(--sur2); color: var(--txt); border: 1px solid var(--bdr);
+      border-radius: 2px; padding: 4px 8px; font-size: 12px; cursor: pointer;
+      min-width: 100px; max-width: 180px;
+    }
+    .po-fc select:focus, .po-fc input[type=text]:focus { outline: 2px solid var(--blu); outline-offset: 1px; }
+
+    /* ── Util cell highlighting — mirrors status badge backgrounds exactly ── */
+    td.util-cell-over     { background: rgba(105,41,196,.12)  !important; }   /* > 100%  Over Util  purple  */
+    td.util-cell-healthy  { background: rgba(25,128,56,.12)   !important; }   /* ≥ 70%   Healthy    green   */
+    td.util-cell-moderate { background: rgba(178,134,0,.12)   !important; }   /* ≥ 50%   Moderate   yellow  */
+    td.util-cell-low      { background: rgba(87,96,106,.12)   !important; }   /* ≥ 30%   Low Util   grey    */
+    td.util-cell-at-risk  { background: rgba(218,30,40,.12)   !important; }   /* < 30%   At Risk    red     */
+    td.util-cell-expired  { background: rgba(87,96,106,.07)   !important; }   /* Expired            lt-grey */
+
+    /* ── Individual Org View ─────────────────────────────────────────────── */
+    #iov-header { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px; }
+    .iov-ctrl { display: flex; flex-direction: column; gap: 6px; }
+    .iov-ctrl label { font-size: 12px; color: var(--mut); font-weight: 500; }
+    /* Searchable combobox */
+    .iov-combo { position: relative; min-width: 300px; }
+    .iov-combo-input {
+      width: 100%; box-sizing: border-box;
+      background: var(--sur); color: var(--txt); border: 1px solid var(--bdr);
+      border-radius: 2px; padding: 6px 28px 6px 10px; font-size: 13px; cursor: text;
+    }
+    .iov-combo-input:focus { outline: 2px solid var(--blu); outline-offset: 1px; }
+    .iov-combo-arrow {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      pointer-events: none; color: var(--mut); font-size: 10px;
+    }
+    .iov-combo-list {
+      display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 999;
+      background: var(--sur); border: 1px solid var(--bdr); border-radius: 2px;
+      max-height: 240px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    }
+    .iov-combo-list.open { display: block; }
+    .iov-combo-option {
+      padding: 7px 10px; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .iov-combo-option:hover, .iov-combo-option.active { background: var(--sur2); }
+    .iov-combo-option.selected { font-weight: 600; color: var(--blu); }
+    .iov-combo-empty { padding: 7px 10px; font-size: 12px; color: var(--mut); font-style: italic; }
+    .iov-timeframe { margin-left: auto; min-width: 320px; }
+    .iov-timeframe label { font-size: 12px; color: var(--mut); font-weight: 500; }
+    .iov-range-wrap {
+      position: relative; height: 24px; margin-top: 6px;
+    }
+    .iov-range-wrap input[type=range] {
+      position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+      margin: 0; padding: 0; background: transparent;
+      -webkit-appearance: none; appearance: none;
+      pointer-events: none; /* Let track clicks pass through */
+    }
+    .iov-range-wrap input[type=range]::-webkit-slider-runnable-track {
+      background: transparent; height: 100%; border: none;
+    }
+    .iov-range-wrap input[type=range]::-moz-range-track {
+      background: transparent; height: 100%; border: none;
+    }
+    .iov-range-wrap input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      pointer-events: auto; /* Allow thumb dragging only */
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--blu-40); border: 2px solid var(--sur);
+      cursor: grab; margin-top: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      transition: background 0.1s, transform 0.1s;
+    }
+    .iov-range-wrap input[type=range]::-webkit-slider-thumb:hover {
+      background: var(--blu); transform: scale(1.15);
+    }
+    .iov-range-wrap input[type=range]::-webkit-slider-thumb:active {
+      cursor: grabbing; background: var(--blu);
+    }
+    .iov-range-wrap input[type=range]::-moz-range-thumb {
+      pointer-events: auto;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--blu-40); border: 2px solid var(--sur);
+      cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      transition: background 0.1s, transform 0.1s;
+    }
+    .iov-range-wrap input[type=range]::-moz-range-thumb:hover {
+      background: var(--blu); transform: scale(1.15);
+    }
+    .iov-range-wrap input[type=range]::-moz-range-thumb:active {
+      cursor: grabbing; background: var(--blu);
+    }
+    .iov-range-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--mut); margin-top: 2px; }
+    .iov-section-title {
+      font-size: 14px; font-weight: 600; color: var(--txt);
+      margin-bottom: 12px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--bdr);
+    }
+    .iov-chart-box { background: var(--sur); border: 1px solid var(--bdr); border-radius: 4px; padding: 20px; margin-top: 20px; }
+    .iov-chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .iov-chart-title { font-size: 14px; font-weight: 600; }
+    .iov-legend { display: flex; gap: 16px; font-size: 12px; color: var(--mut); }
+    .iov-leg-item { display: flex; align-items: center; gap: 5px; }
+    .iov-leg-dot { width: 12px; height: 12px; border-radius: 2px; }
+
+    /* ── Charts ─────────────────────────────────────────────────────────── */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+    .chart-box { background: var(--sur); border: 1px solid var(--bdr); border-radius: 4px; padding: 16px; }
+    .chart-box h3 { font-size: 12px; color: var(--mut); font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px; }
+    .chart-box canvas { width: 100% !important; max-height: 260px; }
+    /* End-consumer bar chart sizes itself (see iovApplyEcLayout) and scrolls inside its wrapper */
+    .chart-box canvas#iov-chart-csum-ec { max-height: none; }
+
+    /* ── Section ─────────────────────────────────────────────────────────── */
+    .section { margin-bottom: 28px; }
+    .section-title {
+      font-size: 14px; font-weight: 600; color: var(--txt);
+      margin-bottom: 14px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--bdr);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title .badge {
+      font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 10px;
+      background: var(--sur2); color: var(--mut);
+    }
+
+    /* ── Placeholder panel ───────────────────────────────────────────────── */
+    .placeholder {
+      background: var(--sur); border: 1px dashed var(--bdr);
+      border-radius: 4px; padding: 60px 24px;
+      text-align: center; color: var(--mut);
+    }
+    .placeholder h2 { font-size: 18px; font-weight: 300; margin-bottom: 8px; color: var(--txt); }
+    .placeholder p  { font-size: 13px; max-width: 480px; margin: 0 auto; }
+
+    /* ── Tags ────────────────────────────────────────────────────────────── */
+    .tag { display: inline-block; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 2px; }
+    .tag-msp { background: #dce8fb; color: #1a56c4; }
+    .tag-ccb { background: #fdf5d4; color: #7d5c00; }
+    .tag-ns  { background: #d5f2de; color: #145a2c; }
+    .tag-ren { background: #fde8d4; color: #9e3f00; }
+    .tag-ext { background: #ede0fb; color: #4d1fa0; }
+
+    /* ── Empty state ─────────────────────────────────────────────────────── */
+    #empty-state { text-align: center; padding: 80px 24px; color: var(--mut); display: none; }
+    #empty-state h2 { font-size: 20px; font-weight: 300; margin-bottom: 12px; }
+    code { background: var(--sur); border: 1px solid var(--bdr); border-radius: 2px;
+      padding: 2px 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+
+    /* ── GLOSSARY tab styles ─────────────────────────────────────────────── */
+    .glo-header {
+      margin-bottom: 20px;
+    }
+    .glo-header h2 {
+      font-size: 18px; font-weight: 600; color: var(--txt); margin-bottom: 4px;
+    }
+    .glo-header p {
+      font-size: 12px; color: var(--mut);
+    }
+    .glo-controls {
+      display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;
+      background: var(--sur); border: 1px solid var(--bdr); border-radius: 4px; padding: 14px 16px;
+    }
+    .glo-search-row {
+      display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    }
+    .glo-search-wrap {
+      position: relative; flex: 1; min-width: 260px; max-width: 480px;
+    }
+    .glo-search-input {
+      width: 100%; height: 32px; padding: 0 30px 0 10px;
+      font-size: 13px; font-family: inherit;
+      background: var(--bg); color: var(--txt);
+      border: 1px solid var(--bdr); border-radius: 3px;
+    }
+    .glo-search-input:focus { outline: 2px solid var(--blu); outline-offset: 1px; }
+    .glo-search-clear {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      cursor: pointer; color: var(--mut); font-size: 14px; font-weight: bold;
+      background: none; border: none; padding: 0; line-height: 1; display: none;
+    }
+    .glo-search-clear:hover { color: var(--txt); }
+    .glo-count-badge {
+      font-size: 12px; color: var(--mut); white-space: nowrap; font-variant-numeric: tabular-nums;
+    }
+    .glo-category-pills {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .glo-pill {
+      font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 12px;
+      border: 1px solid var(--bdr); background: var(--bg); color: var(--mut);
+      cursor: pointer; transition: all 0.1s; user-select: none;
+    }
+    .glo-pill:hover { border-color: var(--blu-40); color: var(--txt); }
+    .glo-pill.active {
+      background: var(--blu-40); color: #ffffff; border-color: var(--blu-40); font-weight: 600;
+    }
+    .glo-table-wrap {
+      border: 1px solid var(--bdr); border-radius: 4px; overflow: hidden; background: var(--sur);
+    }
+    .glo-table {
+      width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;
+    }
+    .glo-table thead th {
+      background: var(--bg); color: var(--mut); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 16px;
+      border-bottom: 2px solid var(--bdr);
+    }
+    .glo-cat-hdr td {
+      background: var(--sur2); font-weight: 600; font-size: 12px; color: var(--txt);
+      padding: 9px 16px; border-top: 1px solid var(--bdr); border-bottom: 1px solid var(--bdr);
+    }
+    .glo-table tbody td {
+      padding: 11px 16px; border-bottom: 1px solid var(--bdr); vertical-align: top;
+    }
+    .glo-table tbody tr.glo-row:hover { background: rgba(15, 98, 254, 0.04); }
+    .glo-badge {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      padding: 2px 8px; border-radius: 3px; white-space: nowrap;
+    }
+    .glo-term {
+      font-weight: 600; color: var(--txt); min-width: 180px;
+    }
+    .glo-def {
+      color: var(--txt); line-height: 1.5;
+    }
+    .glo-empty {
+      padding: 32px 16px; text-align: center; color: var(--mut); font-style: italic;
+    }
+
+    /* ── PDF export button ───────────────────────────────────────────────── */
+    #iov-pdf-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--sur2); color: var(--txt);
+      border: 1px solid var(--bdr); border-radius: 2px;
+      padding: 5px 12px; font-size: 12px; font-weight: 500;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      margin-left: auto;
+    }
+    #iov-pdf-btn:hover { background: var(--bdr); }
+    #iov-pdf-btn:disabled { opacity: .5; cursor: not-allowed; }
+    #iov-pdf-btn svg { flex-shrink: 0; }
+
+    /* ── PDF generation overlay ──────────────────────────────────────────── */
+    #iov-pdf-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9000;
+      background: rgba(31,35,40,.55); align-items: center; justify-content: center;
+    }
+    #iov-pdf-overlay.visible { display: flex; }
+    #iov-pdf-overlay-box {
+      background: var(--bg); border: 1px solid var(--bdr); border-radius: 6px;
+      padding: 28px 36px; text-align: center; min-width: 240px;
+    }
+    #iov-pdf-overlay-box p { font-size: 13px; color: var(--mut); margin-top: 12px; }
+    .iov-pdf-spinner {
+      width: 32px; height: 32px; margin: 0 auto;
+      border: 3px solid var(--sur2); border-top-color: var(--blu);
+      border-radius: 50%; animation: iov-spin .7s linear infinite;
+    }
+    @keyframes iov-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- ── Download notice (hidden once JS runs) ──────────────────────────────── -->
+<div id="download-notice" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#393939;color:#f4f4f4;font-family:IBM Plex Sans,Segoe UI,system-ui,sans-serif;font-size:13px;padding:10px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.4)">
+  <span style="font-size:16px">⚠�</span>
+  <span>This dashboard requires JavaScript. If charts are not showing, <strong>download the file</strong> and open it directly in your browser (Chrome, Edge, Firefox, or Safari on iOS/Mac).</span>
+  <button onclick="document.getElementById('download-notice').style.display='none'" style="margin-left:auto;background:transparent;border:1px solid #f4f4f4;color:#f4f4f4;padding:3px 10px;border-radius:2px;cursor:pointer;font-size:12px">Dismiss</button>
+</div>
+<script>
+  // Hide the notice immediately if scripts are running fine
+  (function(){ var n=document.getElementById('download-notice'); if(n) n.style.display='none'; })();
+</script>
+
+<!-- ── Top-level tabs ─────────────────────────────────────────────────────── -->
+<div id="top-tabs">
+  <button class="top-tab active" data-ttab="program-overview">Program Overview</button>
+  <button class="top-tab"        data-ttab="individual-org">Individual Org View</button>
+  <button class="top-tab"        data-ttab="glossary">Glossary</button>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main id="main">
+
+  <div id="empty-state">
+    <h2>No data loaded</h2>
+    <p>Drop weekly Excel files into <code>Source files/</code> and run <code>npm run build</code></p>
+  </div>
+
+  <div id="dashboard" style="display:none">
+
+    <!-- Apptio page header — always at the very top -->
+    <div id="po-page-header">
+      <div class="po-logo-area">
+        <div class="po-logo-icon">
+          <img src="data:image/png;base64,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" alt="Apptio an IBM Company" height="72" style="display:block">
+        </div>
+        <div class="po-title-block">
+          <div class="po-title">MSP &amp; CCB Program Performance</div>
+          <div class="po-subtitle">METRICS IN BUILD/VALIDATION STAGES</div>
+        </div>
+      </div>
+      <div class="po-refresh" id="po-refresh-ts"></div>
+    </div>
+
+    <!-- Filter bar — shown on Program Overview only -->
+    <div id="snap-bar">
+      <div class="po-fc">
+        <label>YEAR/MONTH</label>
+        <select id="po-f-yearmonth"><option value="">All</option></select>
+      </div>
+      <div class="po-fc">
+        <label>NAME</label>
+        <select id="po-f-name"><option value="">All</option></select>
+      </div>
+      <div class="po-fc">
+        <label>VENDOR</label>
+        <select id="po-f-vendor"><option value="">All</option></select>
+      </div>
+      <div class="po-fc">
+        <label>TYPE</label>
+        <select id="po-f-type">
+          <option value="">All</option>
+          <option value="MSP">MSP</option>
+          <option value="CCB">CCB</option>
+        </select>
+      </div>
+      <div class="po-fc">
+        <label>REGION</label>
+        <select id="po-f-iot"><option value="">All</option></select>
+      </div>
+      <div class="po-fc">
+        <label>CONTRACT TYPE</label>
+        <select id="po-f-ctype">
+          <option value="">All</option>
+          <option value="Annual">Annual</option>
+          <option value="Monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="po-fc">
+        <label>STATUS</label>
+        <select id="po-f-status">
+          <option value="">All</option>
+          <option value="Early Stage">Early Stage</option>
+          <option value="Healthy">Healthy</option>
+          <option value="Moderate">Moderate</option>
+          <option value="At Risk">At Risk</option>
+          <option value="Over Utilization">Over Utilization</option>
+          <option value="Low Utilization">Low Utilization</option>
+          <option value="Expired">Expired</option>
+        </select>
+      </div>
+      <div class="filter-scope-note">* Filters apply to KPIs, charts and the Management Overview table</div>
+    </div>
+
+    <!-- ����������������������������������������������������������������������
+         TAB: Program Overview
+    �������������������������������������������������������������������������� -->
+    <div id="tab-program-overview">
+
+      <!-- KPI row -->
+      <div class="kpi-row" id="kpi-row"></div>
+
+      <!-- Management Org Details table -->
+      <div class="iov-section-title" style="margin-top:8px">Management Org Details</div>
+      <div class="mgmt-table-wrap" id="po-mgmt-wrap">
+        <table class="mgmt-table" id="po-mgmt-tbl">
+          <thead id="po-mgmt-thead"></thead>
+          <tbody id="po-mgmt-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Full-width Monthly CSUM chart -->
+      <div class="chart-box" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin-bottom:0">Monthly CSUM Trending</h3>
+        </div>
+        <canvas id="chart-csum-monthly" style="max-height:300px"></canvas>
+      </div>
+
+      <!-- Annual CSUM Trending — full width line chart -->
+      <div class="chart-box" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 id="csum-trend-title" style="margin-bottom:0">Annual CSUM Trending</h3>
+          <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
+            <span id="csum-trend-commit-label" style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#ff832b;border-radius:2px"></span>Annual Commit</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#4589ff;border-radius:2px"></span>Total Configured CSUM</span>
+          </div>
+        </div>
+        <canvas id="chart-csum-trend" style="max-height:220px"></canvas>
+      </div>
+
+      <!-- Configured CSUM — MSP vs CCB by Month — full width -->
+      <!-- MSP vs CCB — full width -->
+      <div class="chart-box" style="margin-bottom:20px">
+        <h3>Configured CSUM — MSP vs CCB by Month</h3>
+        <canvas id="chart-type-month" style="max-height:260px"></canvas>
+      </div>
+
+      <!-- Configured CSUM by Vendor — full width -->
+      <div class="chart-box" style="margin-bottom:20px">
+        <h3>Configured CSUM by Vendor</h3>
+        <canvas id="chart-vendor-cost" style="max-height:260px"></canvas>
+      </div>
+
+    </div><!-- /tab-program-overview -->
+
+    <!-- ����������������������������������������������������������������������
+         TAB: Individual Org View
+    �������������������������������������������������������������������������� -->
+    <div id="tab-individual-org" style="display:none">
+
+      <!-- Header: org selector + timeframe slider -->
+      <div id="iov-header">
+        <div class="iov-ctrl">
+          <label for="iov-combo-input">Select Management Org</label>
+          <div class="iov-combo" id="iov-combo">
+            <input id="iov-combo-input" class="iov-combo-input" type="text"
+                   placeholder="Search or select an org…" autocomplete="off" spellcheck="false" />
+            <span class="iov-combo-arrow">▼</span>
+            <div class="iov-combo-list" id="iov-combo-list"></div>
+          </div>
+        </div>
+
+        <!-- Timeframe slider -->
+        <div class="iov-ctrl iov-timeframe">
+          <label>Timeframe: <span id="iov-range-label">—</span></label>
+          <div class="iov-range-wrap" style="position:relative;height:20px;margin-top:6px">
+            <input type="range" id="iov-range-start" min="0" max="11" value="0"
+                   style="position:absolute;width:100%;pointer-events:none;appearance:none;background:transparent;z-index:3">
+            <input type="range" id="iov-range-end"   min="0" max="11" value="11"
+                   style="position:absolute;width:100%;pointer-events:none;appearance:none;background:transparent;z-index:4">
+            <div id="iov-range-track" style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--sur2);border-radius:2px;transform:translateY(-50%);z-index:1">
+              <div id="iov-range-fill" style="position:absolute;height:100%;background:var(--blu);border-radius:2px;"></div>
+            </div>
+          </div>
+          <div class="iov-range-labels">
+            <span id="iov-range-label-start"></span>
+            <span id="iov-range-label-end"></span>
+          </div>
+        </div>
+
+        <!-- Export PDF button -->
+        <button id="iov-pdf-btn" title="Export this org view to PDF">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5.5L9.5 0H4zm5 1v4h4L9 1zM5 9h6v1H5V9zm0 2h6v1H5v-1zm0-4h2v1H5V7z"/>
+          </svg>
+          Export PDF
+        </button>
+      </div>
+
+      <!-- Management Org Details (single-row) -->
+      <div class="iov-section-title">Management Org Details</div>
+      <div class="mgmt-table-wrap" style="margin-bottom:20px">
+        <table class="mgmt-table" id="iov-mgmt-tbl">
+          <thead id="iov-mgmt-thead"></thead>
+          <tbody id="iov-mgmt-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- 1. CSUM Trending (Assigned vs Unassigned) — Full width -->
+      <div class="chart-box" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin-bottom:0">CSUM Trending (Assigned vs Unassigned)</h3>
+          <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:12px;height:12px;background:#42be65;border-radius:2px"></span>assigned to end consumer</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:12px;height:12px;background:#b4b4b4;border-radius:2px"></span>not assigned to end consumer</span>
+          </div>
+        </div>
+        <canvas id="iov-csum-chart" style="max-height:320px"></canvas>
+      </div>
+
+      <!-- 4 Charts Grid (2x2) -->
+      <div class="charts-row">
+        <!-- End Consumers Trending -->
+        <div class="chart-box">
+          <h3>End Consumers Trending</h3>
+          <canvas id="iov-chart-ec-trend" style="max-height:280px"></canvas>
+        </div>
+
+        <!-- CSUM Trending by End Consumer -->
+        <div class="chart-box" style="display:flex;flex-direction:column">
+          <h3>CSUM Trending by End Consumer</h3>
+          <div id="iov-wrap-csum-ec" style="overflow-y:auto;flex:1">
+            <div id="iov-inner-csum-ec" style="position:relative">
+              <canvas id="iov-chart-csum-ec"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <!-- CSUM Trending by Committed Amount -->
+        <div class="chart-box">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <h3 id="iov-csum-committed-title" style="margin-bottom:0">CSUM Trending by Commit</h3>
+            <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#42be65;border-radius:2px"></span>Configured CSUM</span>
+              <span id="iov-csum-commit-legend-label" style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#ff832b;border-radius:2px"></span>Commit Amount</span>
+            </div>
+          </div>
+          <canvas id="iov-chart-csum-committed" style="max-height:280px"></canvas>
+        </div>
+
+        <!-- CSUM Trending by Vendor -->
+        <div class="chart-box">
+          <h3>CSUM Trending by Vendor</h3>
+          <canvas id="iov-chart-csum-vendor" style="max-height:280px"></canvas>
+        </div>
+      </div>
+
+    </div><!-- /tab-individual-org -->
+
+    <!-- ����������������������������������������������������������������������
+         TAB: Data Detail
+         Full data table with filters, column picker and CSV export.
+         Uses the same __MSP_DATA__ already on the page — no rebuild needed.
+    �������������������������������������������������������������������������� -->
+    
+
+    <!-- ����������������������������������������������������������������������
+         TAB: Glossary
+    �������������������������������������������������������������������������� -->
+    <div id="tab-glossary" style="display:none">
+      <div class="glo-header">
+        <h2>Glossary of Terms</h2>
+        <p>Reference guide for metrics, dimensions, and definitions used across MSP &amp; CCB reporting.</p>
+      </div>
+
+      <div class="glo-controls">
+        <div class="glo-search-row">
+          <div class="glo-search-wrap">
+            <input type="text" id="glo-search-input" class="glo-search-input" placeholder="Search term or definition…" autocomplete="off" spellcheck="false" />
+            <button id="glo-search-clear" class="glo-search-clear" title="Clear search">✕</button>
+          </div>
+          <div id="glo-count" class="glo-count-badge">Showing 0 of 0 terms</div>
+        </div>
+        <div id="glo-pills" class="glo-category-pills"></div>
+      </div>
+
+      <div class="glo-table-wrap">
+        <table class="glo-table" id="glo-tbl">
+          <thead>
+            <tr>
+              <th style="width: 20%;">Category</th>
+              <th style="width: 25%;">Term</th>
+              <th style="width: 55%;">Definition</th>
+            </tr>
+          </thead>
+          <tbody id="glo-tbody"></tbody>
+        </table>
+      </div>
+    </div><!-- /tab-glossary -->
+
+  </div><!-- /dashboard -->
+</main>
+
+<!-- PDF generation overlay — shown while building the PDF -->
+<div id="iov-pdf-overlay">
+  <div id="iov-pdf-overlay-box">
+    <div class="iov-pdf-spinner"></div>
+    <p id="iov-pdf-overlay-msg">Building PDF…</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+/*{{DATA_INJECTION}}*/
+(function () {
+  'use strict';
+
+  // ── Guard ────────────────────────────────────────────────────────────────
+  if (typeof window.__MSP_DATA__ === 'undefined' || !window.__MSP_DATA__.snapshotDates.length) {
+    document.getElementById('empty-state').style.display = 'block';
+    document.getElementById('top-tabs').style.display = 'none';
+    return;
+  }
+  document.getElementById('dashboard').style.display = 'block';
+
+  const D = window.__MSP_DATA__;
+
+  // Program Overview page header — Data Refreshed timestamp
+  (function() {
+    const el = document.getElementById('po-refresh-ts');
+    if (!el) return;
+    const snap = D.weeklySnapshots && D.weeklySnapshots[0];
+    const d = snap ? new Date(snap.snapshotDate + 'T12:00:00') : new Date(D.generatedAt);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formatted = String(d.getDate()).padStart(2, '0') + ' - ' + months[d.getMonth()] + ' - ' + d.getFullYear();
+    el.innerHTML = 'Data Refreshed: ' + formatted;
+  })();
+
+  // ��������������������������������������������������������������������������
+  // TOP-LEVEL TAB SWITCHING
+  // ��������������������������������������������������������������������������
+
+  const TOP_TABS = ['program-overview', 'individual-org', 'glossary'];
+  const snapBar  = document.getElementById('snap-bar');
+
+  function switchTopTab(id) {
+    document.querySelectorAll('.top-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.ttab === id));
+    TOP_TABS.forEach(t =>
+      document.getElementById('tab-' + t).style.display = t === id ? '' : 'none');
+    // Filter bar only relevant on program-overview
+    snapBar.style.display = id === 'program-overview' ? '' : 'none';
+    if (id === 'individual-org') iovInit();
+    if (id === 'glossary')       gloInit();
+  }
+
+  document.querySelectorAll('.top-tab').forEach(btn =>
+    btn.addEventListener('click', () => switchTopTab(btn.dataset.ttab)));
+
+  // ��������������������������������������������������������������������������
+  // SNAPSHOT RECORDS — always latest
+  // ��������������������������������������������������������������������������
+
+  function snapRecords() {
+    const latest = D.weeklySnapshots[0]?.snapshotDate || '';
+    const s = D.weeklySnapshots.find(s => s.snapshotDate === latest);
+    return s ? s.records : [];
+  }
+
+  // Formatting
+  function fmtV(v) {
+    if (v == null) return '—';
+    if (Math.abs(v) >= 1e9) return '$' + (v/1e9).toFixed(1) + 'B';
+    if (Math.abs(v) >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
+    return '$' + v.toFixed(0);
+  }
+  // Axis-tick formatter — only shows clean round values, suppresses fractional ticks
+  function fmtAxis(v) {
+    if (v == null || v === 0) return '$0';
+    const abs = Math.abs(v);
+    if (abs >= 1e9) { const n = v/1e9; return Number.isInteger(n) || (n*10)%1===0 ? '$'+(n).toFixed(n%1===0?0:1).replace(/\.0$/,'')+' B' : null; }
+    if (abs >= 1e6) { const n = v/1e6; return Number.isInteger(n) || (n*10)%1===0 ? '$'+(n).toFixed(n%1===0?0:1).replace(/\.0$/,'')+' M' : null; }
+    if (abs >= 1e3) { const n = v/1e3; return Number.isInteger(n) ? '$'+n+'K' : null; }
+    return Number.isInteger(v) ? '$'+v : null;
+  }
+  function fmtDelta(d, base) {
+    if (d == null || base == null) return '';
+    const sign = d >= 0 ? '+' : '';
+    const pct  = base !== 0 ? (d / Math.abs(base) * 100).toFixed(1) : '—';
+    return sign + fmtV(d) + (pct !== '—' ? ` (${sign}${pct}%)` : '');
+  }
+  function sum(arr, key) { return arr.reduce((s, r) => s + (Number(r[key]) || 0), 0); }
+  function groupBy(arr, key) {
+    const m = {};
+    arr.forEach(r => { const k = r[key] || '(blank)'; if (!m[k]) m[k] = []; m[k].push(r); });
+    return m;
+  }
+
+  function renderBoth() {
+    const rowsA = snapRecords();
+    renderKPIs(rowsA, rowsA);
+    renderMgmtTable(rowsA);
+    renderCharts(rowsA);
+  }
+
+  // ��������������������������������������������������������������������������
+  // PROGRAM OVERVIEW — KPIs  (Apptio-style)
+  // ��������������������������������������������������������������������������
+
+  // Early Stage rule for Annual contracts (pending business confirmation):
+  //   Early Stage = tenure <= EARLY_STAGE_MAX_MONTHS AND pacing ratio < EARLY_STAGE_BELOW_RATIO.
+  //   0.85 → every young contract below "Healthy" is Early Stage (per logic redesign doc).
+  //   0.35 → only contracts that would otherwise be "At Risk" are Early Stage;
+  //          ratios 0.35–0.85 then show Low Utilization / Moderate as usual.
+  const EARLY_STAGE_MAX_MONTHS  = 2;
+  const EARLY_STAGE_BELOW_RATIO = 0.85;
+
+  function buildMgmtOrgs(rows, targetYM) {
+    // Group rows by name + contractEnd so each distinct contract gets its own row.
+    const orgMap = {};
+    rows.forEach(r => {
+      const name = r.name || r.managementOrgName || '(Unknown)';
+      const key  = name + '||' + (r.contractEnd || '');
+      if (!orgMap[key]) {
+        orgMap[key] = {
+          name:           name,
+          type:           r.type,
+          vendor:         r.vendor || '',
+          iot:            r.iot || '',
+          region:         r.region || '',
+          market:         r.imt || '',
+          owner:          r.owner || r.ibmClientName || null,
+          contractStart:  r.contractStart,
+          contractEnd:    r.contractEnd,
+          tenureMonths:   r.tenureMonths,
+          contractType:   r.contractType,
+          committedAmount:      0,
+          committedAmountSum:   0,   // for AVERAGE(committedAmount) ALLEXCEPT NAME
+          committedAmountCount: 0,
+          csumCurrent:          0,
+          csumCurrentSeen:      new Map(), // dedup: endConsumerName|vendor → {contractStart, csum}
+          csumLifetime:         0,
+          csumLifetimeSeen:     new Map(), // dedup: yearMonth|endConsumerName|vendor → {contractStart, csum}
+          endConsumers:   new Set(),
+          targetEndConsumers: new Set(),
+          yearMonths:     new Set(),
+          latestYM:       '',
+          targetMatched:  false,
+        };
+      }
+      const o = orgMap[key];
+      if (r.yearMonth) o.yearMonths.add(r.yearMonth);
+
+      const isTarget = targetYM ? (r.yearMonth === targetYM) : Boolean(r.isLatestMonth);
+      if (isTarget) {
+        o.targetMatched = true;
+        o.reportingMonth = r.yearMonth;
+        o.contractStart = r.contractStart || o.contractStart;
+        o.contractEnd   = r.contractEnd || o.contractEnd;
+        o.tenureMonths  = r.tenureMonths !== undefined ? r.tenureMonths : o.tenureMonths;
+        o.contractType  = r.contractType || o.contractType;
+        o.owner         = r.owner || r.ibmClientName || o.owner;
+        o.vendor        = r.vendor || o.vendor;
+        o.iot           = r.iot || o.iot;
+        o.region        = r.region || o.region;
+        o.market        = r.imt || o.market;
+        o.type          = r.type || o.type;
+        // Dedup key: one line item per endConsumer+vendor+configuredCSum per target month.
+        // The entry in csumCurrentSeen stores the contractStart of the row already counted;
+        // replace it (and adjust the running total) if this row has a later contractStart.
+        const dedupKeyCurrent = (r.endConsumerName || '') + '|' + (r.vendor || '') + '|' + String(r.configuredCSum ?? '');
+        const prev = o.csumCurrentSeen.get(dedupKeyCurrent);
+        if (!prev) {
+          o.csumCurrentSeen.set(dedupKeyCurrent, { contractStart: r.contractStart || '', csum: r.configuredCSum || 0 });
+          o.csumCurrent += r.configuredCSum || 0;
+        } else if ((r.contractStart || '') > prev.contractStart) {
+          o.csumCurrent = o.csumCurrent - prev.csum + (r.configuredCSum || 0);
+          o.csumCurrentSeen.set(dedupKeyCurrent, { contractStart: r.contractStart || '', csum: r.configuredCSum || 0 });
+        }
+        if (r.endConsumerName) o.targetEndConsumers.add(r.endConsumerName);
+      }
+
+      // Track latest row's metadata as fallback
+      if ((r.yearMonth || '') > o.latestYM) {
+        o.latestYM      = r.yearMonth || '';
+        o.latestContractStart = r.contractStart;
+        o.latestContractEnd   = r.contractEnd;
+        o.latestTenureMonths  = r.tenureMonths;
+        o.latestContractType  = r.contractType;
+        o.latestOwner         = r.owner || r.ibmClientName || o.owner;
+        o.latestVendor        = r.vendor || o.vendor;
+        o.latestIot           = r.iot || o.iot;
+        o.latestRegion        = r.region || o.region;
+        o.latestMarket        = r.imt || o.market;
+        o.latestType          = r.type || o.type;
+      }
+      // CSUM lifetime: cumulative across all months up to targetYM (or all rows if no targetYM)
+      // Deduplicate same row appearing under multiple contracts for the same month.
+      if (!targetYM || (r.yearMonth && r.yearMonth <= targetYM)) {
+        const dedupKeyLifetime = (r.yearMonth || '') + '|' + (r.endConsumerName || '') + '|' + (r.vendor || '') + '|' + String(r.configuredCSum ?? '');
+        const prevL = o.csumLifetimeSeen.get(dedupKeyLifetime);
+        if (!prevL) {
+          o.csumLifetimeSeen.set(dedupKeyLifetime, { contractStart: r.contractStart || '', csum: r.configuredCSum || 0 });
+          o.csumLifetime += r.configuredCSum || 0;
+        } else if ((r.contractStart || '') > prevL.contractStart) {
+          o.csumLifetime = o.csumLifetime - prevL.csum + (r.configuredCSum || 0);
+          o.csumLifetimeSeen.set(dedupKeyLifetime, { contractStart: r.contractStart || '', csum: r.configuredCSum || 0 });
+        }
+      }
+      // Committed amount — max for single value, plus sum/count for AVERAGE across dup lines
+      o.committedAmount      = Math.max(o.committedAmount, r.committedAmount || 0);
+      o.committedAmountSum  += r.committedAmount || 0;
+      o.committedAmountCount++;
+      // End consumers
+      if (r.endConsumerName) o.endConsumers.add(r.endConsumerName);
+    });
+
+    return Object.values(orgMap).map(o => {
+      const endConsumerCount = o.targetMatched ? o.targetEndConsumers.size : o.endConsumers.size;
+      const reportingMonth = o.targetMatched ? o.reportingMonth : (targetYM || o.latestYM);
+      // % Utilization:
+      //   Monthly: csumCurrent  / committedAmount
+      //   Annual:  csumLifetime / committedAmount
+      // Status:
+      //   Monthly: flat bands on utilization %.
+      //   Annual:  pacing-adjusted — pacingRatio = actualPct / expectedPct, where
+      //            expectedPct = min(tenureMonths,12)/12 × 100 (linear burn).
+      const contractType = o.targetMatched ? o.contractType : o.latestContractType;
+      const tenure  = o.targetMatched ? o.tenureMonths : o.latestTenureMonths;
+      const contractEnd = o.targetMatched ? o.contractEnd : o.latestContractEnd;
+      const elapsed = Math.min(tenure || 1, 12);
+      const snapDate = D.weeklySnapshots?.[0]?.snapshotDate || '';
+      const isExpired = Boolean(contractEnd && snapDate && contractEnd < snapDate);
+      let utilPct = null;
+      if (o.committedAmount > 0) {
+        utilPct = ((contractType === 'Monthly' ? o.csumCurrent : o.csumLifetime) / o.committedAmount) * 100;
+      }
+      const csumTotal = o.csumLifetime;
+      let status;
+      if (isExpired) {
+        status = 'Expired';
+      } else if (contractType === 'Annual') {
+        const expectedPct = (elapsed / 12) * 100;
+        const pacingRatio = utilPct !== null && expectedPct > 0 ? utilPct / expectedPct : null;
+        if      (csumTotal === 0)                         status = 'No CSUM';
+        else if (pacingRatio === null)                    status = 'Expired';
+        else if (elapsed <= EARLY_STAGE_MAX_MONTHS && pacingRatio < EARLY_STAGE_BELOW_RATIO) status = 'Early Stage';
+        else if (pacingRatio > 1.15)                      status = 'Over Utilization';
+        else if (pacingRatio >= 0.85)                     status = 'Healthy';
+        else if (pacingRatio >= 0.60)                     status = 'Moderate';
+        else if (pacingRatio >= 0.35)                     status = 'Low Utilization';
+        else                                              status = 'At Risk';
+      } else {
+        if      (csumTotal === 0)        status = 'No CSUM';
+        else if (utilPct === null)       status = 'Expired';
+        else if (utilPct > 100)          status = 'Over Utilization';
+        else if (utilPct >= 70)          status = 'Healthy';
+        else if (utilPct >= 50)          status = 'Moderate';
+        else if (utilPct >= 30)          status = 'Low Utilization';
+        else if (utilPct > 0)            status = 'At Risk';
+        else                             status = 'Expired';
+      }
+
+      return {
+        name:            o.name,
+        type:            o.targetMatched ? o.type : o.latestType,
+        vendor:          o.targetMatched ? o.vendor : o.latestVendor,
+        iot:             o.targetMatched ? o.iot : o.latestIot,
+        region:          o.targetMatched ? o.region : o.latestRegion,
+        market:          o.targetMatched ? o.market : o.latestMarket,
+        reportingMonth,
+        yearMonths:      [...o.yearMonths].sort(),
+        contractStart:   o.targetMatched ? o.contractStart : o.latestContractStart,
+        contractEnd:     o.targetMatched ? o.contractEnd : o.latestContractEnd,
+        tenureMonths:    o.targetMatched ? o.tenureMonths : o.latestTenureMonths,
+        contractType:    o.targetMatched ? o.contractType : o.latestContractType,
+        owner:           o.targetMatched ? o.owner : o.latestOwner,
+        status,
+        endConsumerCount,
+        csumCurrent:     o.csumCurrent,
+        csumLifetime:    o.csumLifetime,
+        utilPct,
+        committedAmount: o.committedAmount,
+      };
+    });
+  }
+
+  function renderKPIs(rowsA, rowsB) {
+    // rowsA — fully filtered rows (all active filters applied): drives count KPIs.
+    // rowsB — filtered by everything except yearMonth: drives Total CSUM KPIs so
+    //         "Last Month" and "Last 12 Months" are never cut off by the YM selector.
+    const csumRows = rowsB || rowsA;
+
+    const snap = D.weeklySnapshots && D.weeklySnapshots[0];
+    const snapDate = snap?.snapshotDate || '';
+
+    // Active contracts filter (CONTRACT_START_DATE <= snapDate AND CONTRACT_END_DATE >= snapDate)
+    const activeContractRows = rowsA.filter(r => {
+      if (!snapDate || !r.contractStart || !r.contractEnd) return true;
+      return r.contractStart <= snapDate && r.contractEnd >= snapDate;
+    });
+
+    // Deduplicate active orgs by customer identifier (CUSTOMER_NAME_FULL_MRGD / MANAGEMENT_ORG_NAME / NAME)
+    const activeOrgNames    = new Set(activeContractRows.map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
+    const activeMSPNames    = new Set(activeContractRows.filter(o => o.type === 'MSP').map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
+    const activeCCBNames    = new Set(activeContractRows.filter(o => o.type === 'CCB').map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
+    const activeWithECNames = new Set(activeContractRows.filter(o => o.endConsumerName).map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
+
+    // Active Management Orgs
+    const activeMgmtOrgs = activeOrgNames.size;
+    // Active MSP / CCB Orgs
+    const activeMSP = activeMSPNames.size;
+    const activeCCB = activeCCBNames.size;
+    // Mgmt Orgs with Active End Consumers
+    const withEC = activeWithECNames.size;
+    const withECpct = activeMgmtOrgs > 0
+      ? Math.round(withEC / activeMgmtOrgs * 100) + '%'
+      : '—';
+    // Total End Consumers — unique names where isLatestMonth = true (uses csumRows — no YM filter)
+    const allEC = new Set();
+    csumRows.filter(r => r.isLatestMonth === true).forEach(r => { if (r.endConsumerName) allEC.add(r.endConsumerName); });
+    const totalEC = allEC.size;
+    // CSUM: last month — uses csumRows so yearMonth filter does not suppress it
+    const csumLastMonth = csumRows.filter(r => r.isLatestMonth).reduce((s,r) => s + (r.configuredCSum||0), 0);
+    // CSUM: last 12 months — uses csumRows so yearMonth filter does not suppress it
+    const csumL12 = csumRows.filter(r => r.isL12Months).reduce((s,r) => s + (r.configuredCSum||0), 0);
+
+    function fmtC(v) {
+      if (!v) return '$0';
+      if (v >= 1e9) return '$' + (v/1e9).toFixed(3).replace(/\.?0+$/,'') + 'B';
+      if (v >= 1e6) return '$' + (v/1e6).toFixed(3).replace(/\.?0+$/,'') + 'M';
+      if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+      return '$' + v.toFixed(0);
+    }
+
+    const cards = [
+      { label: 'Active\nManagement Orgs',       value: activeMgmtOrgs.toString() },
+      { label: 'Active\nMSP Orgs',               value: activeMSP.toString() },
+      { label: 'Active\nCCB Orgs',               value: activeCCB.toString() },
+      { label: 'Management Orgs with\nActive End Consumers (%)', value: withECpct },
+      { label: 'Total End Consumers\n(Active Orgs)', value: totalEC.toLocaleString() },
+      { label: 'Total CSUM\n(Last Month)',        value: fmtC(csumLastMonth), accent: true },
+      { label: 'Total CSUM\n(Last 12 Months)',    value: fmtC(csumL12),       accent: true },
+    ];
+
+    document.getElementById('kpi-row').innerHTML = cards.map(c => `
+      <div class="kpi-card${c.accent ? ' accent' : ''}">
+        <div class="kpi-label">${c.label.replace(/\n/g,'<br>')}</div>
+        <div class="kpi-value">${c.value}</div>
+      </div>`).join('');
+  }
+
+  // ��������������������������������������������������������������������������
+  // PROGRAM OVERVIEW — Management Org Details table
+  // ��������������������������������������������������������������������������
+
+  const MGMT_COLS = [
+    { key:'name',            label:'Name' },
+    { key:'type',            label:'MSP or CCB' },
+    { key:'reportingMonth',  label:'Reporting\nMonth' },
+    { key:'contractStart',   label:'Contract\nStart Date' },
+    { key:'contractEnd',     label:'Contract\nEnd Date' },
+    { key:'tenureMonths',    label:'Tenure\n(Months)',      num:true },
+    { key:'contractType',    label:'Contract\nType' },
+    { key:'owner',           label:'Owner' },
+    { key:'status',          label:'Status' },
+    { key:'endConsumerCount',label:'End\nConsumers',        num:true },
+    { key:'csumCurrent',     label:'CSUM (Current\nMonth)', num:true, money:true },
+    { key:'csumLifetime',    label:'CSUM\n(Lifetime)',      num:true, money:true },
+    { key:'utilPct',         label:'Utilization %',         util:true },
+    { key:'committedAmount', label:'Commit\nAmount',        num:true, money:true },
+  ];
+
+  // ── Table filter state ────────────────────────────────────────────────────
+  const poTableFilter = { yearMonth: '', name: '', vendor: '', type: '', iot: '', ctype: '', status: '' };
+  let poFilteredOrgs = [];  // last rendered list (for filter info)
+
+  let poMgmtSort = { col: 'csumCurrent', dir: -1 };
+
+  function statusBadge(s) {
+    const cls = s === 'Healthy'          ? 'status-healthy'
+              : s === 'Early Stage'      ? 'status-early-stage'
+              : s === 'Moderate'         ? 'status-moderate'
+              : s === 'At Risk'          ? 'status-at-risk'
+              : s === 'Over Utilization' ? 'status-over-util'
+              : s === 'Low Utilization'  ? 'status-low-util'
+              : s === 'No CSUM'          ? 'status-no-csum'
+              : s === 'Expired'          ? 'status-expired'
+              : s === 'No Data'          ? 'status-expired'
+              : 'status-low-util';
+    return `<span class="status-badge ${cls}">${s || '—'}</span>`;
+  }
+
+  // Bar / text colours follow the row Status (annual status is pacing-based, not raw %).
+  const UTIL_STATUS_COLORS = {
+    'Over Utilization': { bar: '#a56eff', text: '#6929c4' },
+    'Healthy':          { bar: '#42be65', text: '#198038' },
+    'Moderate':         { bar: '#f1c21b', text: '#7d5c00' },
+    'Low Utilization':  { bar: '#8d9299', text: '#57606a' },
+    'Early Stage':      { bar: '#4589ff', text: '#1a56c4' },
+    'At Risk':          { bar: '#fa4d56', text: '#da1e28' },
+    'Expired':          { bar: '#8d9299', text: '#57606a' },
+    'No CSUM':          { bar: '#8d9299', text: '#57606a' },
+  };
+  function utilBar(pct, status) {
+    if (pct === null || pct === undefined) return '<span style="color:var(--mut)">—</span>';
+    // Scale: 0–100% fills 0–100% of the bar; >100% fills bar completely (capped at 100%)
+    const fillW     = pct > 100 ? 100 : Math.max(pct, 0);
+    const sc        = UTIL_STATUS_COLORS[status] || UTIL_STATUS_COLORS['At Risk'];
+    const barColor  = sc.bar;
+    const textColor = sc.text;
+    return `<div class="util-bar-wrap">
+      <div class="util-bar-bg"><div class="util-bar-fill" style="width:${fillW.toFixed(1)}%;background:${barColor}"></div></div>
+      <span class="util-bar-pct" style="color:${textColor}">${pct.toFixed(2)}%</span>
+    </div>`;
+  }
+
+  function mgmtCellHTML(org, col) {
+    const v = org[col.key];
+    if (col.util)  return utilBar(v, org.status);
+    if (col.key === 'status') return statusBadge(v);
+    if (col.money) return v != null ? fmtV(v) : '—';
+    if (col.num)   return v != null ? Number(v).toLocaleString() : '—';
+    return v != null && v !== '' ? String(v) : '—';
+  }
+
+  function applyPoTableFilter(orgs) {
+    const f = poTableFilter;
+    return orgs.filter(o => {
+      if (f.yearMonth && !o.yearMonths.includes(f.yearMonth)) return false;
+      if (f.name      && o.name         !== f.name)           return false;
+      if (f.vendor    && o.vendor       !== f.vendor)         return false;
+      if (f.type      && o.type         !== f.type)           return false;
+      if (f.iot       && o.iot          !== f.iot)            return false;
+      if (f.ctype     && o.contractType !== f.ctype)          return false;
+      if (f.status    && o.status       !== f.status)         return false;
+      return true;
+    });
+  }
+
+  // Row-level filter — mirrors poTableFilter on raw records (for KPIs & charts)
+  function applyPoRowFilter(rows) {
+    const f = poTableFilter;
+    return rows.filter(r => {
+      if (f.yearMonth && r.yearMonth    !== f.yearMonth) return false;
+      if (f.name      && (r.name || r.managementOrgName) !== f.name) return false;
+      if (f.vendor    && r.vendor       !== f.vendor)    return false;
+      if (f.type      && r.type         !== f.type)      return false;
+      if (f.iot       && r.iot          !== f.iot)       return false;
+      if (f.ctype     && r.contractType !== f.ctype)     return false;
+      return true;
+    });
+  }
+
+  // Same filter but WITHOUT the yearMonth restriction — used for Total CSUM KPIs
+  // so they always reflect all months (Last Month / Last 12 Months are inherently time-bounded).
+  function applyPoRowFilterNoYM(rows) {
+    const f = poTableFilter;
+    return rows.filter(r => {
+      if (f.name   && (r.name || r.managementOrgName) !== f.name) return false;
+      if (f.vendor && r.vendor       !== f.vendor)    return false;
+      if (f.type   && r.type         !== f.type)      return false;
+      if (f.iot    && r.iot          !== f.iot)       return false;
+      if (f.ctype  && r.contractType !== f.ctype)     return false;
+      return true;
+    });
+  }
+
+  let poFilterDropdownsPopulated = false;
+  function populatePoFilterDropdowns(orgs) {
+    if (poFilterDropdownsPopulated) return;
+    poFilterDropdownsPopulated = true;
+
+    function fill(id, values) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const cur = el.value;
+      while (el.options.length > 1) el.remove(1);
+      values.forEach(v => v && el.appendChild(new Option(v, v)));
+      if (values.includes(cur)) el.value = cur;
+    }
+    const sortedAsc  = v => [...new Set(orgs.flatMap(o => v(o)).filter(Boolean))].sort();
+    const sortedDesc = v => [...new Set(orgs.flatMap(o => v(o)).filter(Boolean))].sort().reverse();
+
+    const ymList = sortedDesc(o => o.yearMonths);
+    fill('po-f-yearmonth', ymList);
+
+    // Default to the latest Year/Month if available and not already set
+    if (!poTableFilter.yearMonth && ymList.length > 0) {
+      const ymSelect = document.getElementById('po-f-yearmonth');
+      if (ymSelect) {
+        ymSelect.value = ymList[0];
+        poTableFilter.yearMonth = ymList[0];
+      }
+    }
+
+    fill('po-f-name',      sortedAsc(o => [o.name]));
+    fill('po-f-vendor',    sortedAsc(o => [o.vendor]));
+    fill('po-f-iot',       sortedAsc(o => [o.iot]));
+  }
+
+  let poFilterBarWired = false;
+  function wirePoFilterBar(rows) {
+    if (poFilterBarWired) return;
+    poFilterBarWired = true;
+    const mappings = [
+      ['po-f-yearmonth', 'yearMonth'],
+      ['po-f-name',      'name'],
+      ['po-f-vendor',    'vendor'],
+      ['po-f-type',      'type'],
+      ['po-f-iot',       'iot'],
+      ['po-f-ctype',     'ctype'],
+      ['po-f-status',    'status'],
+    ];
+    mappings.forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', e => {
+        poTableFilter[key] = e.target.value;
+        renderMgmtTable(rows);
+      });
+    });
+  }
+
+  function renderMgmtTable(rows) {
+    const allOrgs = buildMgmtOrgs(rows, poTableFilter.yearMonth);
+    populatePoFilterDropdowns(allOrgs);
+    wirePoFilterBar(rows);
+    const orgs = applyPoTableFilter(allOrgs);
+    poFilteredOrgs = orgs;
+
+    // Re-render KPIs and charts with the filtered row set so they stay in sync.
+    // filteredRows     — all filters applied (used for count KPIs and charts).
+    // filteredRowsNoYM — all filters except yearMonth (used for Total CSUM KPIs,
+    //                    which are inherently time-bounded by isLatestMonth / isL12Months).
+    const filteredRows     = applyPoRowFilter(rows);
+    const filteredRowsNoYM = applyPoRowFilterNoYM(rows);
+    renderKPIs(filteredRows, filteredRowsNoYM);
+    renderCharts(filteredRows);
+    // Sort
+    orgs.sort((a, b) => {
+      const va = a[poMgmtSort.col], vb = b[poMgmtSort.col];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * poMgmtSort.dir;
+      return String(va).localeCompare(String(vb)) * poMgmtSort.dir;
+    });
+
+    // Filter info
+    const infoEl = document.getElementById('po-filter-info');
+    if (infoEl) infoEl.textContent = orgs.length + ' of ' + allOrgs.length + ' orgs';
+
+    // Header
+    const thead = document.getElementById('po-mgmt-thead');
+    thead.innerHTML = '';
+    const tr = document.createElement('tr');
+    MGMT_COLS.forEach(c => {
+      const th = document.createElement('th');
+      th.innerHTML = c.label.replace(/\n/g,'<br>');
+      if (c.key === poMgmtSort.col) th.classList.add(poMgmtSort.dir === 1 ? 'asc' : 'desc');
+      th.addEventListener('click', () => {
+        if (poMgmtSort.col === c.key) poMgmtSort.dir *= -1;
+        else { poMgmtSort.col = c.key; poMgmtSort.dir = -1; }
+        renderMgmtTable(rows);
+      });
+      tr.appendChild(th);
+    });
+    thead.appendChild(tr);
+
+    // Body
+    const tbody = document.getElementById('po-mgmt-tbody');
+    tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    orgs.forEach(org => {
+      const tr2 = document.createElement('tr');
+      MGMT_COLS.forEach(c => {
+        const td = document.createElement('td');
+        td.innerHTML = mgmtCellHTML(org, c);
+        if (c.num || c.util) td.classList.add('num');
+        if (c.util) {
+          td.classList.add('util-bar-cell');
+          // Apptio-style cell background tint on utilization column
+          const p = org.utilPct;
+          if (p !== null && p !== undefined) {
+            const s = org.status;
+            if      (s === 'Over Utilization') td.classList.add('util-cell-over');
+            else if (s === 'Healthy')          td.classList.add('util-cell-healthy');
+            else if (s === 'Moderate')         td.classList.add('util-cell-moderate');
+            else if (s === 'Low Utilization')  td.classList.add('util-cell-low');
+            else if (s === 'Early Stage')      td.classList.add('util-cell-early');
+            else if (s === 'Expired')          td.classList.add('util-cell-expired');
+            else                               td.classList.add('util-cell-at-risk');
+          }
+        }
+        tr2.appendChild(td);
+      });
+      // Click row → go to Individual Org View
+      tr2.addEventListener('click', () => {
+        switchTopTab('individual-org');
+        iovSelectOrg(org.name);
+      });
+      frag.appendChild(tr2);
+    });
+    tbody.appendChild(frag);
+  }
+
+  // ��������������������������������������������������������������������������
+  // PROGRAM OVERVIEW — Charts
+  // ��������������������������������������������������������������������������
+
+  Chart.defaults.color = '#57606a';
+  Chart.defaults.borderColor = '#d1d5db';
+  Chart.defaults.scale.grid.color = '#e8eaed';
+  Chart.defaults.scale.ticks.maxTicksLimit = 6;
+  const CHARTS  = {};
+  const PALETTE = ['#1a56c4','#198038','#b28600','#e07b39','#6929c4','#007d79','#da1e28','#2563c8','#24a148','#d2a106'];
+
+  function makeChart(id, cfg) {
+    if (CHARTS[id]) CHARTS[id].destroy();
+    const el = document.getElementById(id);
+    if (el) CHARTS[id] = new Chart(el, cfg);
+  }
+
+  function renderCharts(rows) {
+    // 1. Annual CSUM Trending — L12 Months + Annual contracts
+    //    Committed Amount: per-month (deduped by SO)
+    //    Configured CSUM: CUMULATIVE running total
+    (function buildCsumTrendChart() {
+      const trendRows = rows.filter(r => r.isL12Months === true && r.contractType === 'Annual');
+      const trendMonths = [...new Set(trendRows.map(r => r.yearMonth))].filter(Boolean).sort();
+      const moNames = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December'];
+      const trendLabels = trendMonths.map(ym => {
+        const [y, m] = String(ym).split('-');
+        return (moNames[parseInt(m,10)-1] || m) + ' ' + y;
+      });
+
+      // Configured CSUM — CUMULATIVE running total
+      let running = 0;
+      const csumData = trendMonths.map(ym => {
+        running += sum(trendRows.filter(r => r.yearMonth === ym), 'configuredCSum');
+        return running;
+      });
+
+      // Committed Amount — deduplicate by salesOrderNum per month
+      const committedData = trendMonths.map(ym => {
+        const seen = {};
+        trendRows.filter(r => r.yearMonth === ym).forEach(r => {
+          if (r.salesOrderNum == null) return;
+          const k = String(r.salesOrderNum);
+          if (!(k in seen)) seen[k] = r.committedAmount || 0;
+        });
+        return Object.values(seen).reduce((s, v) => s + v, 0);
+      });
+
+      // Sparse label plugin — labels ~4 evenly-spaced non-edge points on each dataset
+      const sparseLabelPlugin = {
+        id: 'csumTrendLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.font = '10px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          data.datasets.forEach((ds, di) => {
+            const n = ds.data.length;
+            if (n < 2) return;
+            const step = Math.max(1, Math.floor(n / 4));
+            const meta = chart.getDatasetMeta(di);
+            meta.data.forEach((pt, i) => {
+              // skip first, last and non-step indices to avoid crowding
+              if (i === 0 || i === n - 1 || i % step !== 0) return;
+              const val = ds.data[i];
+              if (!val) return;
+              ctx.fillStyle = ds.borderColor;
+              ctx.fillText(fmtV(val), pt.x, pt.y - 6);
+            });
+          });
+          ctx.restore();
+        }
+      };
+
+      makeChart('chart-csum-trend', {
+        type: 'line',
+        data: {
+          labels: trendLabels,
+          datasets: [
+            {
+              label: 'Total Annual Commit',
+              data: committedData,
+              borderColor: '#ff832b',
+              backgroundColor: 'rgba(255,131,43,0.07)',
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0.3,
+              fill: false,
+            },
+            {
+              label: 'Total Configured CSUM',
+              data: csumData,
+              borderColor: '#4589ff',
+              backgroundColor: 'rgba(69,137,255,0.07)',
+              borderWidth: 2.5,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              tension: 0.3,
+              fill: false,
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          layout: { padding: { top: 20 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtV(c.parsed.y) } }
+          },
+          scales: {
+            x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                maxTicksLimit: 5,
+                callback: v => {
+                  // Only show clean round values — skip fractional M/B steps
+                  const s = fmtV(v);
+                  return s.includes('.') && !s.endsWith('B') && !s.endsWith('M') ? null : s;
+                }
+              }
+            }
+          }
+        },
+        plugins: [sparseLabelPlugin],
+      });
+    })();
+
+    // Shared inline plugin: draw value labels above vertical bars
+    const barLabelsPlugin = {
+      id: 'barLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        ctx.save();
+        ctx.font = '10px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'var(--mut)';
+        data.datasets.forEach((ds, dsIdx) => {
+          chart.getDatasetMeta(dsIdx).data.forEach((bar, i) => {
+            const val = ds.data[i];
+            if (!val) return;
+            ctx.fillText(fmtV(val), bar.x, bar.y - 3);
+          });
+        });
+        ctx.restore();
+      }
+    };
+
+    // Shared inline plugin: draw value labels at end of horizontal bars
+    const hBarLabelsPlugin = {
+      id: 'hBarLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        ctx.save();
+        ctx.font = '10px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'var(--mut)';
+        data.datasets.forEach((ds, dsIdx) => {
+          chart.getDatasetMeta(dsIdx).data.forEach((bar, i) => {
+            const val = ds.data[i];
+            if (!val) return;
+            ctx.fillText(fmtV(val), bar.x + 4, bar.y);
+          });
+        });
+        ctx.restore();
+      }
+    };
+
+    // Shared inline plugin: draw percentage labels on doughnut slices
+    const doughnutLabelsPlugin = {
+      id: 'doughnutLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        const ds = data.datasets[0];
+        const total = ds.data.reduce((a, b) => a + b, 0);
+        if (!total) return;
+        ctx.save();
+        ctx.font = 'bold 11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        chart.getDatasetMeta(0).data.forEach((arc, i) => {
+          const val = ds.data[i];
+          if (!val || val / total < 0.04) return;
+          const angle = (arc.startAngle + arc.endAngle) / 2;
+          const r = (arc.innerRadius + arc.outerRadius) / 2;
+          ctx.fillText((val / total * 100).toFixed(1) + '%', arc.x + Math.cos(angle) * r, arc.y + Math.sin(angle) * r);
+        });
+        ctx.restore();
+      }
+    };
+
+    // 2. Configured CSUM — MSP vs CCB by Month — L12, grouped double bar, x = YYYY-MM
+    (function buildMspCcbChart() {
+      const l12Rows = rows.filter(r => r.isL12Months === true);
+      const l12Months = [...new Set(l12Rows.map(r => r.yearMonth))].filter(Boolean).sort();
+      makeChart('chart-type-month', {
+        type: 'bar',
+        data: {
+          labels: l12Months,
+          datasets: [
+            {
+              label: 'MSP',
+              data: l12Months.map(m => sum(l12Rows.filter(r => r.type === 'MSP' && r.yearMonth === m), 'configuredCSum')),
+              backgroundColor: 'rgba(69,137,255,0.85)',
+              borderColor: '#4589ff',
+              borderWidth: 1,
+              borderRadius: 2,
+            },
+            {
+              label: 'CCB',
+              data: l12Months.map(m => sum(l12Rows.filter(r => r.type === 'CCB' && r.yearMonth === m), 'configuredCSum')),
+              backgroundColor: 'rgba(241,194,27,0.85)',
+              borderColor: '#f1c21b',
+              borderWidth: 1,
+              borderRadius: 2,
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 12 } } },
+            tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtV(c.parsed.y) } }
+          },
+          scales: {
+            x: { ticks: { font: { size: 11 }, maxRotation: 45 } },
+            y: { beginAtZero: true, ticks: { callback: v => fmtV(v) } }
+          }
+        },
+        plugins: [barLabelsPlugin],
+      });
+    })();
+
+    // 3. Configured CSUM by vendor — L12 months only, consistent with MSP vs CCB chart
+    const vcRows = rows.filter(r => r.isL12Months === true);
+    const vcGrp = groupBy(vcRows, 'vendor');
+    const vcLbls = Object.keys(vcGrp).filter(k => k && k !== '(blank)' && sum(vcGrp[k], 'configuredCSum') > 0).sort((a, b) => sum(vcGrp[b], 'configuredCSum') - sum(vcGrp[a], 'configuredCSum'));
+    makeChart('chart-vendor-cost', {
+      type: 'bar',
+      data: { labels: vcLbls, datasets: [{ label: 'Configured CSUM', data: vcLbls.map(k => sum(vcGrp[k], 'configuredCSum')), backgroundColor: vcLbls.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 2, barPercentage: 0.6, categoryPercentage: 0.8 }] },
+      options: { responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtV(c.parsed.y) } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => fmtV(v) } } } },
+      plugins: [barLabelsPlugin],
+    });
+
+    // 4. CSUM & Total Committed Amount chart
+    // Monthly → last 12 months, grouped by YYYY-MM, labels "Month YYYY"
+    // Annual  → all years, grouped by calendar year from yearMonth, labels "2024" / "2025" …
+    const csumMoNames = ['January','February','March','April','May','June',
+                         'July','August','September','October','November','December'];
+
+    function buildCsumChart(sourceRows) {
+      // Always Monthly — last 12 months, grouped by YYYY-MM
+      const filtered = sourceRows.filter(r =>
+        r.isL12Months === true && r.contractType === 'Monthly'
+      );
+      const csumMonths = [...new Set(filtered.map(r => r.yearMonth))].filter(Boolean).sort();
+      const csumLabels = csumMonths.map(ym => {
+        const [y, m] = String(ym).split('-');
+        return (csumMoNames[parseInt(m,10)-1] || m) + ' ' + y;
+      });
+      // configuredCSum: sum all rows (cost is legitimately per row)
+      const csumData = csumMonths.map(ym =>
+        sum(filtered.filter(r => r.yearMonth === ym), 'configuredCSum')
+      );
+      // committedAmount: deduplicate by salesOrderNum per month
+      const committedData = csumMonths.map(ym => {
+        const monthRows = filtered.filter(r => r.yearMonth === ym);
+        const seen = {};
+        monthRows.forEach(r => {
+          const k = String(r.salesOrderNum);
+          if (!(k in seen)) seen[k] = r.committedAmount || 0;
+        });
+        return Object.values(seen).reduce((s, v) => s + v, 0);
+      });
+
+      // Inline plugin: draw value label above each bar
+      const csumBarLabelsPlugin = {
+        id: 'csumBarLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.font = '11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          data.datasets.forEach((ds, dsIdx) => {
+            const meta = chart.getDatasetMeta(dsIdx);
+            meta.data.forEach((bar, i) => {
+              const val = ds.data[i];
+              if (!val) return;
+              ctx.fillStyle = ds.backgroundColor;
+              ctx.fillText(fmtV(val), bar.x, bar.y - 4);
+            });
+          });
+          ctx.restore();
+        }
+      };
+
+      makeChart('chart-csum-monthly', {
+        type: 'bar',
+        data: {
+          labels: csumLabels,
+          datasets: [
+            { label: 'Total Configured CSUM', data: csumData,      backgroundColor: '#4589ff' },
+            { label: 'Monthly Commit',         data: committedData, backgroundColor: '#ff832b' },
+          ]
+        },
+        options: {
+          responsive: true,
+          layout: { padding: { top: 28 } },
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtV(c.parsed.y) } }
+          },
+          scales: {
+            x: { stacked: false },
+            y: { stacked: false, ticks: { maxTicksLimit: 5, callback: v => {
+              const s = fmtV(v); return s.includes('.') && !s.endsWith('B') && !s.endsWith('M') ? null : s;
+            }}}
+          }
+        },
+        plugins: [csumBarLabelsPlugin],
+      });
+    }
+
+    buildCsumChart(rows);
+  }
+
+    // INDIVIDUAL ORG VIEW
+  // ��������������������������������������������������������������������������
+
+  const MONTHS_IOV = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+  function fmtYMLabel(ym) {
+    if (!ym) return '';
+    const [y, m] = String(ym).split('-');
+    return (MONTHS_IOV[parseInt(m,10)-1] || m) + ' ' + y;
+  }
+
+  let iovInitialized = false;
+  let iovAllOrgs = [];        // array of org name strings
+  let iovCurrentOrg = '';
+
+  // ── Slider state ─────────────────────────────────────────────────────────
+  // iovAllMonths: sorted array of all YYYY-MM strings across the whole dataset
+  // iovSliderStart/End: indices into iovAllMonths currently selected
+  let iovAllMonths  = [];
+  let iovSliderStart = 0;
+  let iovSliderEnd   = 0;
+
+  function iovInit() {
+    if (iovInitialized) return;
+    iovInitialized = true;
+
+    // Collect all management org names from the most recent snapshot (using Name field)
+    const snap = D.weeklySnapshots[0]?.records ?? [];
+    const orgSet = new Set();
+    snap.forEach(r => {
+      const name = r.name || r.managementOrgName;
+      if (name) orgSet.add(name);
+    });
+
+    iovAllOrgs = [...orgSet].sort();
+
+    // ── Timeframe slider setup ────────────────────────────────────────────────
+    // Build the full sorted list of all months in the dataset (not just L12)
+    const allMonthsSet = new Set();
+    snap.forEach(r => { if (r.yearMonth) allMonthsSet.add(r.yearMonth); });
+    iovAllMonths = [...allMonthsSet].sort();
+    const maxIdx = iovAllMonths.length - 1;
+
+    // Default: show last 12 months (or all if fewer than 12)
+    iovSliderStart = Math.max(0, maxIdx - 11);
+    iovSliderEnd   = maxIdx;
+
+    const elStart  = document.getElementById('iov-range-start');
+    const elEnd    = document.getElementById('iov-range-end');
+    const elFill   = document.getElementById('iov-range-fill');
+    const elLbl    = document.getElementById('iov-range-label');
+    const elLblS   = document.getElementById('iov-range-label-start');
+    const elLblE   = document.getElementById('iov-range-label-end');
+
+    function iovSliderMonthLabel(ym) {
+      if (!ym) return '';
+      const [y, m] = ym.split('-');
+      const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return (names[parseInt(m,10)-1] || m) + ' ' + y;
+    }
+
+    function updateSliderUI() {
+      if (!elStart) return;
+      elStart.min = 0; elStart.max = maxIdx; elStart.value = iovSliderStart;
+      elEnd.min   = 0; elEnd.max   = maxIdx; elEnd.value   = iovSliderEnd;
+      // Fill bar between thumbs
+      const pctS = maxIdx > 0 ? (iovSliderStart / maxIdx) * 100 : 0;
+      const pctE = maxIdx > 0 ? (iovSliderEnd   / maxIdx) * 100 : 100;
+      elFill.style.left  = pctS + '%';
+      elFill.style.width = (pctE - pctS) + '%';
+      // Labels
+      const sLbl = iovSliderMonthLabel(iovAllMonths[iovSliderStart]);
+      const eLbl = iovSliderMonthLabel(iovAllMonths[iovSliderEnd]);
+      if (elLbl)  elLbl.textContent  = sLbl + ' - ' + eLbl;
+      if (elLblS) elLblS.textContent = sLbl;
+      if (elLblE) elLblE.textContent = eLbl;
+    }
+
+    if (elStart && elEnd) {
+      elStart.addEventListener('input', () => {
+        iovSliderStart = Math.min(parseInt(elStart.value, 10), iovSliderEnd);
+        elStart.value = iovSliderStart;
+        elStart.style.zIndex = '5';
+        elEnd.style.zIndex = '4';
+        updateSliderUI();
+        iovRender();
+      });
+      elEnd.addEventListener('input', () => {
+        iovSliderEnd = Math.max(parseInt(elEnd.value, 10), iovSliderStart);
+        elEnd.value = iovSliderEnd;
+        elEnd.style.zIndex = '5';
+        elStart.style.zIndex = '4';
+        updateSliderUI();
+        iovRender();
+      });
+    }
+
+    updateSliderUI();
+
+    // ── Searchable combobox ──────────────────────────────────────────────────
+    const comboInput = document.getElementById('iov-combo-input');
+    const comboList  = document.getElementById('iov-combo-list');
+    let comboActive  = -1; // keyboard-highlighted index
+
+    function buildComboList(filter) {
+      const q = (filter || '').toLowerCase();
+      const matches = q
+        ? iovAllOrgs.filter(n => n.toLowerCase().includes(q))
+        : iovAllOrgs;
+      comboList.innerHTML = '';
+      comboActive = -1;
+      if (matches.length === 0) {
+        comboList.innerHTML = '<div class="iov-combo-empty">No results</div>';
+        return;
+      }
+      matches.forEach((name, i) => {
+        const div = document.createElement('div');
+        div.className = 'iov-combo-option' + (name === iovCurrentOrg ? ' selected' : '');
+        div.textContent = name;
+        div.dataset.val = name;
+        div.addEventListener('mousedown', e => {
+          e.preventDefault(); // keep focus on input
+          pickOrg(name);
+        });
+        comboList.appendChild(div);
+      });
+    }
+
+    function pickOrg(name) {
+      iovCurrentOrg = name;
+      comboInput.value = name;
+      comboList.classList.remove('open');
+      iovRender();
+    }
+
+    comboInput.addEventListener('focus', () => {
+      buildComboList(comboInput.value === iovCurrentOrg ? '' : comboInput.value);
+      comboList.classList.add('open');
+    });
+
+    comboInput.addEventListener('input', () => {
+      buildComboList(comboInput.value);
+      comboList.classList.add('open');
+    });
+
+    comboInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        comboList.classList.remove('open');
+        if (!iovCurrentOrg || !iovAllOrgs.includes(comboInput.value)) {
+          comboInput.value = iovCurrentOrg || '';
+        }
+      }, 150);
+    });
+
+    comboInput.addEventListener('keydown', e => {
+      const items = comboList.querySelectorAll('.iov-combo-option');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        comboActive = Math.min(comboActive + 1, items.length - 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        comboActive = Math.max(comboActive - 1, 0);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (comboActive >= 0 && items[comboActive]) {
+          pickOrg(items[comboActive].dataset.val);
+        } else if (items.length === 1) {
+          pickOrg(items[0].dataset.val);
+        }
+        return;
+      } else if (e.key === 'Escape') {
+        comboInput.value = iovCurrentOrg || '';
+        comboList.classList.remove('open');
+        return;
+      } else { return; }
+      items.forEach((el, i) => el.classList.toggle('active', i === comboActive));
+      if (items[comboActive]) items[comboActive].scrollIntoView({ block: 'nearest' });
+    });
+
+    // Auto-select the first org
+    if (iovAllOrgs.length > 0) {
+      pickOrg(iovAllOrgs[0]);
+    }
+
+    // ── Export PDF button ─────────────────────────────────────────────────
+    const pdfBtn = document.getElementById('iov-pdf-btn');
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', () => iovExportPDF());
+    }
+  }
+
+  // ── "CSUM Trending by End Consumer" layout ────────────────────────────────
+  // Each bar gets EC_ROW_PX of height. Up to EC_VISIBLE_ROWS bars: chart is shown
+  // in full, no scrollbar. More than that: the viewport is limited to
+  // EC_VISIBLE_ROWS bars and the wrapper scrolls vertically. expandAll (PDF export)
+  // removes the limit so every bar is rendered at full, readable height.
+  const EC_ROW_PX = 28, EC_PAD_PX = 40, EC_VISIBLE_ROWS = 10;
+  const EC_PDF_ROW_PX = 20;   // compact row height used only while exporting to PDF
+  function iovApplyEcLayout(wrap, inner, n, expandAll) {
+    if (!wrap || !inner) return;
+    const rowPx = expandAll ? EC_PDF_ROW_PX : EC_ROW_PX;
+    inner.style.height = Math.max(expandAll ? 200 : 300, n * rowPx + EC_PAD_PX) + 'px';
+    if (expandAll) {
+      wrap.style.maxHeight = 'none';
+      wrap.style.overflowY = 'visible';
+    } else if (n > EC_VISIBLE_ROWS) {
+      wrap.style.maxHeight = (EC_VISIBLE_ROWS * EC_ROW_PX + EC_PAD_PX) + 'px';
+      wrap.style.overflowY = 'auto';
+    } else {
+      wrap.style.maxHeight = 'none';
+      wrap.style.overflowY = 'auto';
+    }
+  }
+
+  // ── PDF export — html2canvas + jsPDF (Mac + Windows, no print dialog) ────
+  async function iovExportPDF() {
+    if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+      alert('PDF libraries are still loading — please try again in a moment.');
+      return;
+    }
+    if (!iovCurrentOrg) {
+      alert('Please select an org first.');
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const overlay    = document.getElementById('iov-pdf-overlay');
+    const overlayMsg = document.getElementById('iov-pdf-overlay-msg');
+    const pdfBtn     = document.getElementById('iov-pdf-btn');
+
+    // Disable button + show spinner overlay
+    if (pdfBtn) pdfBtn.disabled = true;
+    if (overlay) overlay.classList.add('visible');
+
+    // Give the browser one frame to paint the overlay before we block the thread
+    await new Promise(r => setTimeout(r, 60));
+
+    try {
+      const PDF_JPEG_QUALITY = 0.6;    // charts/tables are flat colours — low JPEG quality is fine and keeps the PDF small
+      const A4_W   = 210;   // mm
+      const A4_H   = 297;   // mm
+      const MARGIN = 12;    // mm
+      const CONTENT_W = A4_W - MARGIN * 2;
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      let cursorY = MARGIN;
+      let pageNum = 1;
+
+      // ── helpers ────────────────────────────────────────────────────────
+      function addPage() {
+        pdf.addPage();
+        pageNum++;
+        cursorY = MARGIN;
+      }
+
+      // Capture a DOM element to a canvas and add it to the PDF.
+      async function addElement(el, opts = {}) {
+        if (!el) return 0;
+        const scale  = opts.scale || 2;
+        const canvas = await html2canvas(el, {
+          scale,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: el.scrollWidth,
+          windowHeight: el.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/jpeg', PDF_JPEG_QUALITY);
+        const natW    = canvas.width  / scale;
+        const natH    = canvas.height / scale;
+        const fitW    = CONTENT_W;
+        const fitH    = (natH / natW) * fitW;
+
+        if (cursorY + fitH > A4_H - MARGIN && cursorY > MARGIN + 10) {
+          addPage();
+        }
+        const maxH = A4_H - MARGIN * 2;
+        const h    = Math.min(fitH, maxH);
+        const w    = h < fitH ? (natW / natH) * h : fitW;
+        pdf.addImage(imgData, 'JPEG', MARGIN, cursorY, w, h);
+        cursorY += h + 4;
+        return h + 4;
+      }
+
+      // End-consumer chart: expanded (no scrollbar) and capped so the whole chart fits
+      // on ONE page. If fewer customers than the cap, all are shown. If it does not fit
+      // in the space left on the current page, addElement() moves it to the next page.
+      async function addEcChart(box) {
+        const wrap  = document.getElementById('iov-wrap-csum-ec');
+        const inner = document.getElementById('iov-inner-csum-ec');
+        const chart = CHARTS['iov-csum-ec'];
+        if (!wrap || !inner || !chart) { await addElement(box, { scale: 2 }); return; }
+        const origLabels = chart.data.labels;
+        const origData   = chart.data.datasets[0].data;
+        const n = origLabels.length;
+        let note = null;
+        try {
+          iovApplyEcLayout(wrap, inner, n, true);
+          wrap.scrollTop = 0;
+          // Max bars that fit on one page: page height (in CSS px) minus box chrome and note line.
+          const mmPerCss  = CONTENT_W / box.offsetWidth;
+          const pageCss   = (A4_H - MARGIN * 2) / mmPerCss - 6;
+          const overhead  = box.offsetHeight - inner.offsetHeight;   // title + padding
+          const NOTE_PX   = 26;
+          const maxBars   = Math.max(10, Math.floor((pageCss - overhead - NOTE_PX - EC_PAD_PX) / EC_PDF_ROW_PX));
+          const shown     = Math.min(n, maxBars);
+          if (n > shown) {
+            chart.data.labels = origLabels.slice(0, shown);
+            chart.data.datasets[0].data = origData.slice(0, shown);
+            iovApplyEcLayout(wrap, inner, shown, true);
+            note = document.createElement('div');
+            note.textContent = 'Showing top ' + shown + ' of ' + n + ' end consumers by CSUM — remaining end consumers are not shown in this export.';
+            note.style.cssText = 'font-size:11px;color:#57606a;margin-top:6px;';
+            box.appendChild(note);
+          }
+          chart.update('none');
+          chart.resize();
+          await new Promise(r => setTimeout(r, 150));
+          await addElement(box, { scale: 2 });
+        } finally {
+          if (note) note.remove();
+          chart.data.labels = origLabels;
+          chart.data.datasets[0].data = origData;
+          iovApplyEcLayout(wrap, inner, n, false);
+          chart.update('none');
+          chart.resize();
+        }
+      }
+
+      // ── Page header (IBM logo area + title) ────────────────────────────
+      const pageHeader = document.getElementById('po-page-header');
+      if (overlayMsg) overlayMsg.textContent = 'Capturing header…';
+      await addElement(pageHeader, { scale: 2 });
+
+      // Org name — centred, no timeframe
+      pdf.setFontSize(13);
+      pdf.setTextColor('#1f2328');
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(iovCurrentOrg, A4_W / 2, cursorY, { align: 'center' });
+      cursorY += 13 * 0.4 + 5;
+
+      // ── Management Org Details table ───────────────────────────────────
+      if (overlayMsg) overlayMsg.textContent = 'Capturing org details…';
+      const mgmtSection = document.querySelector('#tab-individual-org .mgmt-table-wrap');
+      await addElement(mgmtSection, { scale: 2 });
+
+      // ── Chart 1: CSUM Trending (Assigned vs Unassigned) ────────────────
+      if (overlayMsg) overlayMsg.textContent = 'Capturing charts (1/5)…';
+      const csumBox = document.getElementById('iov-csum-chart')?.closest('.chart-box');
+      await addElement(csumBox, { scale: 2 });
+
+      // ── Charts 2+3: End Consumers + CSUM by End Consumer ───────────────
+      if (overlayMsg) overlayMsg.textContent = 'Capturing charts (2–3/5)…';
+      const chartsRow1 = document.querySelectorAll('#tab-individual-org .charts-row')[0];
+      if (chartsRow1) {
+        const boxes = chartsRow1.querySelectorAll('.chart-box');
+        for (const box of boxes) {
+          if (box.querySelector('#iov-chart-csum-ec')) await addEcChart(box);
+          else await addElement(box, { scale: 2 });
+        }
+      }
+
+      // ── Charts 4+5: CSUM vs Committed + CSUM by Vendor ────────────────
+      if (overlayMsg) overlayMsg.textContent = 'Capturing charts (4–5/5)…';
+      const chartsRow2 = document.querySelectorAll('#tab-individual-org .charts-row')[1];
+      if (chartsRow2) {
+        const boxes = chartsRow2.querySelectorAll('.chart-box');
+        for (const box of boxes) { await addElement(box, { scale: 2 }); }
+      }
+
+      // ── Footer on every page ───────────────────────────────────────────
+      const totalPages = pdf.internal.getNumberOfPages();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const now = new Date();
+      const genDate = String(now.getDate()).padStart(2, '0') + ' - ' + months[now.getMonth()] + ' - ' + now.getFullYear();
+      for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p);
+        pdf.setFontSize(7.5);
+        pdf.setTextColor('#57606a');
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('MSP & CCB Program Performance  |  ' + iovCurrentOrg, MARGIN, A4_H - 6);
+        pdf.text('Generated ' + genDate + '  ·  Page ' + p + ' of ' + totalPages,
+          A4_W - MARGIN, A4_H - 6, { align: 'right' });
+        pdf.setDrawColor(209, 213, 219);
+        pdf.setLineWidth(0.15);
+        pdf.line(MARGIN, A4_H - 9, A4_W - MARGIN, A4_H - 9);
+      }
+
+      // ── Save ───────────────────────────────────────────────────────────
+      const safeName = iovCurrentOrg.replace(/[^a-zA-Z0-9_\- ]/g, '').trim().replace(/\s+/g, '_');
+      const filename = 'IOV_' + safeName + '.pdf';
+      pdf.save(filename);
+
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('PDF export failed. Please try again.\n\n' + err.message);
+    } finally {
+      if (overlay) overlay.classList.remove('visible');
+      if (pdfBtn)  pdfBtn.disabled = false;
+    }
+  }
+
+  function iovSelectOrg(orgName) {
+    iovInit();
+    const comboInput = document.getElementById('iov-combo-input');
+    comboInput.value = orgName;
+    iovCurrentOrg = orgName;
+    iovRender();
+  }
+
+  function iovRender() {
+    const destroyChart = id => {
+      if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; }
+    };
+
+    if (!iovCurrentOrg) {
+      document.getElementById('iov-mgmt-thead').innerHTML = '';
+      document.getElementById('iov-mgmt-tbody').innerHTML = '';
+      ['iov-csum', 'iov-ec-trend', 'iov-csum-ec', 'iov-csum-committed', 'iov-csum-vendor'].forEach(destroyChart);
+      return;
+    }
+
+    const snap = D.weeklySnapshots[0]?.records ?? [];
+    const orgRows = snap.filter(r =>
+      (r.name || r.managementOrgName) === iovCurrentOrg
+    );
+
+    // ── Management Org Details table (one row per contract) ──────────────
+    const orgs = buildMgmtOrgs(orgRows);
+
+    const iovThead = document.getElementById('iov-mgmt-thead');
+    const iovTbody = document.getElementById('iov-mgmt-tbody');
+    iovThead.innerHTML = '';
+    iovTbody.innerHTML = '';
+
+    if (orgs.length > 0) {
+      // Sort contracts oldest → latest by contractStart so history reads chronologically
+      orgs.sort((a, b) => {
+        const sa = a.contractStart || '', sb = b.contractStart || '';
+        return sa < sb ? -1 : sa > sb ? 1 : 0;
+      });
+
+      // When this org has exactly one contract, label the Commit Amount column with the
+      // contract type (e.g. "Annual Commit Amount" / "Monthly Commit Amount").
+      const singleContractType = orgs.length === 1 ? orgs[0].contractType : null;
+
+      const hdrTr = document.createElement('tr');
+      MGMT_COLS.forEach(c => {
+        const th = document.createElement('th');
+        if (c.key === 'committedAmount' && singleContractType) {
+          th.innerHTML = (singleContractType + ' Commit<br>Amount');
+        } else {
+          th.innerHTML = c.label.replace(/\n/g,'<br>');
+        }
+        hdrTr.appendChild(th);
+      });
+      iovThead.appendChild(hdrTr);
+
+      // Group consecutive rows by name so the Name cell can be rowspan-merged.
+      // Build groups: [{name, rows:[org,…]}, …]
+      const nameGroups = [];
+      orgs.forEach(org => {
+        const last = nameGroups[nameGroups.length - 1];
+        if (last && last.name === org.name) { last.rows.push(org); }
+        else { nameGroups.push({ name: org.name, rows: [org] }); }
+      });
+
+      nameGroups.forEach(group => {
+        group.rows.forEach((org, idx) => {
+          const bodyTr = document.createElement('tr');
+          MGMT_COLS.forEach(c => {
+            // Skip the Name cell on rows after the first — it is covered by rowspan.
+            if (c.key === 'name' && idx > 0) return;
+            const td = document.createElement('td');
+            if (c.key === 'name' && group.rows.length > 1) {
+              td.rowSpan = group.rows.length;
+              td.style.verticalAlign = 'middle';
+            }
+            td.innerHTML = mgmtCellHTML(org, c);
+            if (c.num || c.util) td.classList.add('num');
+            if (c.util) td.classList.add('util-bar-cell');
+            bodyTr.appendChild(td);
+          });
+          iovTbody.appendChild(bodyTr);
+        });
+      });
+    }
+
+    // Filter to slider-selected window, intersected with isL12Months.
+    // Deduplicate across contracts: keep one row per endConsumer|yearMonth|vendor|configuredCSum,
+    // preferring the row with the latest contractStart (newer contract wins).
+    const sliderMin = iovAllMonths[iovSliderStart] || '';
+    const sliderMax = iovAllMonths[iovSliderEnd]   || '';
+
+    const l12Rows = (function() {
+      const raw = orgRows.filter(r =>
+        r.isL12Months === true &&
+        (r.yearMonth || '') >= sliderMin &&
+        (r.yearMonth || '') <= sliderMax
+      );
+      const seen = {};
+      raw.forEach(r => {
+        const k = (r.endConsumerName || '') + '|' + (r.yearMonth || '') + '|'
+                + (r.vendor || '') + '|' + String(r.configuredCSum ?? '');
+        if (!seen[k] || (r.contractStart || '') > (seen[k].contractStart || '')) {
+          seen[k] = r;
+        }
+      });
+      return Object.values(seen);
+    })();
+    // Distinct months in slider window sorted chronologically
+    const l12Months = [...new Set(l12Rows.map(r => r.yearMonth))].filter(Boolean).sort();
+    const l12MonthLabels = l12Months.map(fmtYMLabel);
+
+    function fmtM(v) {
+      if (!v) return '$0';
+      if (Math.abs(v) >= 1e9) return '$' + (v/1e9).toFixed(1) + 'B';
+      if (Math.abs(v) >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+      if (Math.abs(v) >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
+      return '$' + v.toFixed(0);
+    }
+
+    // ── 1. CSUM Trending (Assigned vs Unassigned) — Stacked Bar ─────────────
+    destroyChart('iov-csum');
+    const elCsum = document.getElementById('iov-csum-chart');
+    if (elCsum && l12Months.length > 0) {
+      const assigned = l12Months.map(ym =>
+        l12Rows.filter(r => r.yearMonth === ym && (r.endConsumerName2 || r.endConsumerName))
+               .reduce((s,r) => s + (r.configuredCSum||0), 0)
+      );
+      const unassigned = l12Months.map(ym =>
+        l12Rows.filter(r => r.yearMonth === ym && !(r.endConsumerName2 || r.endConsumerName))
+               .reduce((s,r) => s + (r.configuredCSum||0), 0)
+      );
+      const totals = l12Months.map((_, i) => assigned[i] + unassigned[i]);
+
+      const stackTotalsPlugin = {
+        id: 'stackTotals',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.textAlign = 'center';
+
+          // 1. Segment values inside/on each segment (if enough height)
+          ctx.font = '10px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          data.datasets.forEach((ds, dsIdx) => {
+            const meta = chart.getDatasetMeta(dsIdx);
+            meta.data.forEach((bar, i) => {
+              const val = ds.data[i];
+              if (!val) return;
+              const barHeight = Math.abs(bar.base - bar.y);
+              if (barHeight >= 16) {
+                ctx.fillStyle = dsIdx === 0 ? '#ffffff' : '#1f2328';
+                ctx.textBaseline = 'middle';
+                const midY = (bar.y + bar.base) / 2;
+                ctx.fillText(fmtM(val), bar.x, midY);
+              }
+            });
+          });
+
+          // 2. Total value above the stack
+          ctx.font = 'bold 11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.fillStyle = '#1f2328';
+          ctx.textBaseline = 'bottom';
+          totals.forEach((total, i) => {
+            if (!total) return;
+            const xPos = x.getPixelForValue(i);
+            const yPos = y.getPixelForValue(total);
+            ctx.fillText(fmtM(total), xPos, yPos - 4);
+          });
+          ctx.restore();
+        }
+      };
+
+      CHARTS['iov-csum'] = new Chart(elCsum, {
+        type: 'bar',
+        data: {
+          labels: l12MonthLabels,
+          datasets: [
+            {
+              label: 'assigned to end consumer',
+              data: assigned,
+              backgroundColor: '#42be65',
+              stack: 'csum',
+            },
+            {
+              label: 'not assigned to end consumer',
+              data: unassigned,
+              backgroundColor: '#b4b4b4',
+              stack: 'csum',
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: c => ' ' + c.dataset.label + ': ' + fmtM(c.parsed.y),
+                footer: items => {
+                  const i = items[0].dataIndex;
+                  return 'Total: ' + fmtM(totals[i]);
+                }
+              }
+            },
+          },
+          layout: { padding: { top: 24 } },
+          scales: {
+            x: { stacked: true, ticks: { maxRotation: 45, font: { size: 11 } } },
+            y: {
+              stacked: true,
+              ticks: { callback: v => fmtM(v) }
+            }
+          }
+        },
+        plugins: [stackTotalsPlugin],
+      });
+    }
+
+    // ── 2. End Consumers Trending — Line Chart
+    //    Cumulative distinct count: for each month, count unique consumers seen
+    //    in ALL months up to and including that month (mirrors the DAX CALCULATE +
+    //    FILTER(ALLSELECTED … <= MAX(Year_Month)) pattern).
+    destroyChart('iov-ec-trend');
+    const elEc = document.getElementById('iov-chart-ec-trend');
+    if (elEc && l12Months.length > 0) {
+      const cumulativeSet = new Set();
+      const ecCounts = l12Months.map(ym => {
+        // All rows for this org up to and including this month (use full orgRows, not just l12)
+        orgRows.filter(r => r.yearMonth <= ym).forEach(r => {
+          const ec = r.endConsumerName || r.endConsumerName2;
+          if (ec && String(ec).trim()) cumulativeSet.add(ec);
+        });
+        return cumulativeSet.size;
+      });
+
+      // Sparse labels: pick ~4 evenly-spaced interior indices
+      const ecLen = ecCounts.length;
+      const ecLabelIdx = new Set(
+        ecLen <= 1 ? [0] :
+        [0, Math.round(ecLen * 0.33), Math.round(ecLen * 0.66), ecLen - 1]
+      );
+
+      const ecPointLabelsPlugin = {
+        id: 'ecPointLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          const ds = data.datasets[0];
+          const meta = chart.getDatasetMeta(0);
+          ctx.save();
+          ctx.font = 'bold 11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.fillStyle = '#3b82d4';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          meta.data.forEach((pt, i) => {
+            if (!ecLabelIdx.has(i)) return;
+            const val = ds.data[i];
+            if (val == null) return;
+            ctx.fillText(String(val), pt.x, pt.y - 7);
+          });
+          ctx.restore();
+        }
+      };
+
+      CHARTS['iov-ec-trend'] = new Chart(elEc, {
+        type: 'line',
+        data: {
+          labels: l12MonthLabels,
+          datasets: [{
+            label: 'End Consumer Count',
+            data: ecCounts,
+            borderColor: '#3b82d4',
+            backgroundColor: 'rgba(59,130,212,0.12)',
+            borderWidth: 2.5,
+            pointRadius: 3.5,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          layout: { padding: { top: 20 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ' Count: ' + c.parsed.y } }
+          },
+          scales: {
+            x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            }
+          }
+        },
+        plugins: [ecPointLabelsPlugin],
+      });
+    }
+
+    // ── 3. CSUM Trending by End Consumer — Horizontal Bar (Excluding blank) ──
+    destroyChart('iov-csum-ec');
+    const elCsumEc = document.getElementById('iov-chart-csum-ec');
+    if (elCsumEc) {
+      const ecMap = {};
+      l12Rows.forEach(r => {
+        const ec = r.endConsumerName || r.endConsumerName2;
+        if (ec && String(ec).trim()) {
+          const csum = Number(r.configuredCSum) || 0;
+          if (csum > 0) {
+            ecMap[ec] = (ecMap[ec] || 0) + csum;
+          }
+        }
+      });
+      // Sort descending; show ALL active end consumers (sizing/scroll: iovApplyEcLayout)
+      const ecLabels = Object.keys(ecMap).sort((a,b) => ecMap[b] - ecMap[a]);
+      const ecValues = ecLabels.map(l => ecMap[l]);
+      // Size the container before the chart is created so it renders at the right height
+      const elInnerEc = document.getElementById('iov-inner-csum-ec');
+      const elWrapEc  = document.getElementById('iov-wrap-csum-ec');
+      iovApplyEcLayout(elWrapEc, elInnerEc, ecLabels.length, false);
+
+      const horizBarLabelsPlugin = {
+        id: 'horizBarLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.font = '11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#1f2328';
+          const meta = chart.getDatasetMeta(0);
+          meta.data.forEach((bar, i) => {
+            const val = data.datasets[0].data[i];
+            if (!val) return;
+            ctx.fillText(fmtM(val), bar.x + 6, bar.y);
+          });
+          ctx.restore();
+        }
+      };
+
+      CHARTS['iov-csum-ec'] = new Chart(elCsumEc, {
+        type: 'bar',
+        data: {
+          labels: ecLabels,
+          datasets: [{
+            label: 'Configured CSUM',
+            data: ecValues,
+            backgroundColor: '#42be65',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { right: 65 } },
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ' ' + fmtM(c.parsed.x) } }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              min: 0,
+              ticks: { callback: v => fmtM(v) }
+            },
+            y: {
+              ticks: { font: { size: 11 }, autoSkip: false }
+            }
+          }
+        },
+        plugins: [horizBarLabelsPlugin]
+      });
+    }
+
+    // ── 4. CSUM Trending by Commit — Line Chart ─────────────────────────────
+    // Derive contract type from this org's data to label the commit line correctly
+    const iovContractType = (orgs.length > 0 && orgs[0].contractType) || 'Monthly';
+    const iovCommitLabel  = iovContractType === 'Annual' ? 'Annual Commit' : 'Monthly Commit';
+    const iovCommitTitle  = document.getElementById('iov-csum-committed-title');
+    const iovCommitLegend = document.getElementById('iov-csum-commit-legend-label');
+    if (iovCommitTitle)  iovCommitTitle.textContent = `CSUM Trending by ${iovCommitLabel}`;
+    if (iovCommitLegend) {
+      // Legend span contains a colour swatch <span> + text node — update only the text node
+      const legendNodes = iovCommitLegend.childNodes;
+      legendNodes[legendNodes.length - 1].textContent = iovCommitLabel;
+    }
+
+    destroyChart('iov-csum-committed');
+    const elCsumCommitted = document.getElementById('iov-chart-csum-committed');
+    if (elCsumCommitted && l12Months.length > 0) {
+      let running = 0;
+      const csumAccum = l12Months.map(ym => {
+        running += sum(l12Rows.filter(r => r.yearMonth === ym), 'configuredCSum');
+        return running;
+      });
+
+      // Committed amount per month: sum the max committed value per sales order
+      // across ALL orgRows (not just deduplicated l12Rows), but only for contracts
+      // whose contractEnd falls on or after the first day of that month — this
+      // correctly includes the Annual contract in its final month (Aug) and
+      // excludes it from September onward.
+      const committedPerMonth = l12Months.map(ym => {
+        const seen = {};
+        orgRows.forEach(r => {
+          if (!r.contractEnd || !r.yearMonth) return;
+          // Contract is active in this month if its end date is within this month or later
+          if (r.contractEnd.slice(0, 7) < ym) return;
+          // Also only consider contracts that had data (were signed) by this month
+          if (r.yearMonth > ym) return;
+          const k = String(r.salesOrderNum || r.soLi || 'default');
+          seen[k] = Math.max(seen[k] || 0, r.committedAmount || 0);
+        });
+        return Object.values(seen).reduce((s, v) => s + v, 0);
+      });
+
+      // Sparse labels: ~4 evenly-spaced indices across the series
+      const ccLen = l12Months.length;
+      const ccLabelIdx = new Set(
+        ccLen <= 1 ? [0] :
+        [0, Math.round(ccLen * 0.33), Math.round(ccLen * 0.66), ccLen - 1]
+      );
+
+      // Colors matching Program Overview
+      const COMMITTED_COLOR = '#ff832b';
+      const CSUM_COLOR      = '#42be65';
+
+      const csumCommittedLabelsPlugin = {
+        id: 'csumCommittedLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.font = 'bold 11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.textBaseline = 'bottom';
+          const totalPoints = l12Months.length;
+          data.datasets.forEach((ds, dsIdx) => {
+            const meta = chart.getDatasetMeta(dsIdx);
+            const color = dsIdx === 0 ? COMMITTED_COLOR : CSUM_COLOR;
+            ctx.fillStyle = color;
+            meta.data.forEach((pt, i) => {
+              if (!ccLabelIdx.has(i)) return;
+              const val = ds.data[i];
+              if (!val) return;
+              if (i === 0) {
+                ctx.textAlign = 'left';
+              } else if (i === totalPoints - 1) {
+                ctx.textAlign = 'right';
+              } else {
+                ctx.textAlign = 'center';
+              }
+              ctx.fillText(fmtM(val), pt.x, pt.y - 7);
+            });
+          });
+          ctx.restore();
+        }
+      };
+
+      CHARTS['iov-csum-committed'] = new Chart(elCsumCommitted, {
+        type: 'line',
+        data: {
+          labels: l12MonthLabels,
+          datasets: [
+            {
+              label: iovCommitLabel,
+              data: committedPerMonth,
+              borderColor: COMMITTED_COLOR,
+              backgroundColor: 'rgba(255,131,43,0.08)',
+              borderWidth: 2,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              fill: false,
+            },
+            {
+              label: 'Configured CSUM',
+              data: csumAccum,
+              borderColor: CSUM_COLOR,
+              backgroundColor: 'rgba(66,190,101,0.1)',
+              borderWidth: 2.5,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0.2,
+              fill: false,
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          layout: { padding: { top: 20, right: 30, left: 10 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtM(c.parsed.y) } }
+          },
+          scales: {
+            x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+            y: { beginAtZero: true, ticks: { maxTicksLimit: 5, callback: v => fmtM(v) } }
+          }
+        },
+        plugins: [csumCommittedLabelsPlugin],
+      });
+    }
+
+    // ── 5. CSUM Trending by Vendor — Stacked Bar ────────────────────────────
+    destroyChart('iov-csum-vendor');
+    const elCsumVendor = document.getElementById('iov-chart-csum-vendor');
+    if (elCsumVendor && l12Months.length > 0) {
+      const vendorSet = [...new Set(l12Rows.map(r => r.vendor).filter(Boolean))].sort();
+      const VENDOR_COLORS = {
+        'Amazon': '#3b82d4',
+        'Amazon Web Services': '#3b82d4',
+        'Azure': '#ff832b',
+        'DXC': '#fa4d56',
+        'OCI': '#08bdba',
+        'IBM': '#198038',
+        'GCP': '#f1c21b',
+        'MongoDB': '#6929c4',
+        'Snowflake': '#007d79',
+      };
+
+      const vendorDatasets = vendorSet.map((vendor, idx) => {
+        const color = VENDOR_COLORS[vendor] || PALETTE[idx % PALETTE.length];
+        return {
+          label: vendor,
+          data: l12Months.map(ym =>
+            sum(l12Rows.filter(r => r.yearMonth === ym && r.vendor === vendor), 'configuredCSum')
+          ),
+          backgroundColor: color,
+          stack: 'vendor',
+        };
+      });
+
+      const vendorTotals = l12Months.map(ym =>
+        sum(l12Rows.filter(r => r.yearMonth === ym), 'configuredCSum')
+      );
+
+      const vendorStackPlugin = {
+        id: 'vendorStackLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data, scales: { x, y } } = chart;
+          ctx.save();
+          ctx.textAlign = 'center';
+
+          // 1. Segment values inside segments where height is sufficient
+          ctx.font = '10px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          data.datasets.forEach((ds, dsIdx) => {
+            const meta = chart.getDatasetMeta(dsIdx);
+            meta.data.forEach((bar, i) => {
+              const val = ds.data[i];
+              if (!val) return;
+              const barHeight = Math.abs(bar.base - bar.y);
+              if (barHeight >= 16) {
+                ctx.fillStyle = '#ffffff';
+                ctx.textBaseline = 'middle';
+                const midY = (bar.y + bar.base) / 2;
+                ctx.fillText(fmtM(val), bar.x, midY);
+              }
+            });
+          });
+
+          // 2. Total value above the vendor stack
+          ctx.font = 'bold 11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.fillStyle = '#1f2328';
+          ctx.textBaseline = 'bottom';
+          vendorTotals.forEach((total, i) => {
+            if (!total) return;
+            const xPos = x.getPixelForValue(i);
+            const yPos = y.getPixelForValue(total);
+            ctx.fillText(fmtM(total), xPos, yPos - 4);
+          });
+          ctx.restore();
+        }
+      };
+
+      CHARTS['iov-csum-vendor'] = new Chart(elCsumVendor, {
+        type: 'bar',
+        data: {
+          labels: l12MonthLabels,
+          datasets: vendorDatasets,
+        },
+        options: {
+          responsive: true,
+          layout: { padding: { top: 24 } },
+          plugins: {
+            legend: { position: 'top', align: 'end', labels: { boxWidth: 10, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: c => ' ' + c.dataset.label + ': ' + fmtM(c.parsed.y),
+                footer: items => {
+                  const i = items[0].dataIndex;
+                  return 'Total: ' + fmtM(vendorTotals[i]);
+                }
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, ticks: { maxRotation: 45, font: { size: 11 } } },
+            y: {
+              stacked: true,
+              ticks: { callback: v => fmtM(v) }
+            }
+          }
+        },
+        plugins: [vendorStackPlugin]
+      });
+    }
+  }
+
+  // ��������������������������������������������������������������������������
+  // INITIAL RENDER
+  // ��������������������������������������������������������������������������
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GLOSSARY VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const GLO_CATEGORY_STYLES = {
+    'Core Concepts':                        { bg: 'rgba(15, 98, 254, 0.1)',   color: '#0f62fe', bdr: 'rgba(15, 98, 254, 0.3)' },
+    'Management Org Metrics':               { bg: 'rgba(0, 125, 121, 0.1)',   color: '#007d79', bdr: 'rgba(0, 125, 121, 0.3)' },
+    'CSUM (Cloud Spend Under Management)':  { bg: 'rgba(25, 128, 56, 0.1)',   color: '#198038', bdr: 'rgba(25, 128, 56, 0.3)' },
+    'Lifecycle & Financial Metrics':        { bg: 'rgba(178, 134, 0, 0.1)',   color: '#8a6800', bdr: 'rgba(178, 134, 0, 0.3)' },
+    'Time & Lifecycle Fields':              { bg: 'rgba(105, 41, 196, 0.1)',  color: '#6929c4', bdr: 'rgba(105, 41, 196, 0.3)' },
+    'Organizational Fields':                { bg: 'rgba(218, 30, 40, 0.08)',  color: '#ba1b23', bdr: 'rgba(218, 30, 40, 0.3)' },
+    'Supporting Data Terms':                { bg: 'rgba(87, 96, 106, 0.1)',   color: '#57606a', bdr: 'rgba(87, 96, 106, 0.3)' },
+  };
+
+  const GLO_DEFAULT_STYLE = { bg: 'rgba(15, 98, 254, 0.1)', color: '#0f62fe', bdr: 'rgba(15, 98, 254, 0.3)' };
+
+  let gloInitialized = false;
+  let gloActiveCategory = 'ALL';
+  let gloSearchTerm = '';
+
+  function gloInit() {
+    if (gloInitialized) return;
+    gloInitialized = true;
+
+    const rawList = Array.isArray(D.glossary) ? D.glossary : [];
+
+    // Distinct categories with counts
+    const catMap = new Map();
+    rawList.forEach(item => {
+      const cat = item.category || 'Other';
+      catMap.set(cat, (catMap.get(cat) || 0) + 1);
+    });
+
+    // Render pills
+    const pillsContainer = document.getElementById('glo-pills');
+    if (pillsContainer) {
+      pillsContainer.innerHTML = '';
+
+      // "All" pill
+      const allPill = document.createElement('span');
+      allPill.className = 'glo-pill active';
+      allPill.dataset.cat = 'ALL';
+      allPill.textContent = `All (${rawList.length})`;
+      allPill.addEventListener('click', () => {
+        gloActiveCategory = 'ALL';
+        updatePillsUI();
+        renderGlossary();
+      });
+      pillsContainer.appendChild(allPill);
+
+      catMap.forEach((count, cat) => {
+        const pill = document.createElement('span');
+        pill.className = 'glo-pill';
+        pill.dataset.cat = cat;
+        pill.textContent = `${cat} (${count})`;
+        pill.addEventListener('click', () => {
+          gloActiveCategory = cat;
+          updatePillsUI();
+          renderGlossary();
+        });
+        pillsContainer.appendChild(pill);
+      });
+    }
+
+    // Search events
+    const searchInput = document.getElementById('glo-search-input');
+    const searchClear = document.getElementById('glo-search-clear');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        gloSearchTerm = searchInput.value.trim().toLowerCase();
+        if (searchClear) searchClear.style.display = gloSearchTerm ? 'block' : 'none';
+        renderGlossary();
+      });
+    }
+    if (searchClear) {
+      searchClear.addEventListener('click', () => {
+        if (searchInput) {
+          searchInput.value = '';
+          searchInput.focus();
+        }
+        gloSearchTerm = '';
+        searchClear.style.display = 'none';
+        renderGlossary();
+      });
+    }
+
+    renderGlossary();
+  }
+
+  function updatePillsUI() {
+    document.querySelectorAll('.glo-pill').forEach(p => {
+      p.classList.toggle('active', p.dataset.cat === gloActiveCategory);
+    });
+  }
+
+  function renderGlossary() {
+    const tbody = document.getElementById('glo-tbody');
+    const countEl = document.getElementById('glo-count');
+    if (!tbody) return;
+
+    const rawList = Array.isArray(D.glossary) ? D.glossary : [];
+
+    // Filter by active category & search query
+    const filtered = rawList.filter(item => {
+      const matchCat = (gloActiveCategory === 'ALL') || ((item.category || 'Other') === gloActiveCategory);
+      if (!matchCat) return false;
+      if (!gloSearchTerm) return true;
+      const t = (item.term || '').toLowerCase();
+      const d = (item.definition || '').toLowerCase();
+      const c = (item.category || '').toLowerCase();
+      return t.includes(gloSearchTerm) || d.includes(gloSearchTerm) || c.includes(gloSearchTerm);
+    });
+
+    if (countEl) {
+      countEl.textContent = `Showing ${filtered.length} of ${rawList.length} terms`;
+    }
+
+    tbody.innerHTML = '';
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="glo-empty">No matching glossary terms found.</td></tr>';
+      return;
+    }
+
+    // Group items by category preserving order, then alphabetical within category
+    const groups = new Map();
+    filtered.forEach(item => {
+      const cat = item.category || 'Other';
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat).push(item);
+    });
+
+    const frag = document.createDocumentFragment();
+
+    groups.forEach((items, cat) => {
+      // Sort terms alphabetically within category
+      items.sort((a, b) => (a.term || '').localeCompare(b.term || ''));
+
+      const st = GLO_CATEGORY_STYLES[cat] || GLO_DEFAULT_STYLE;
+
+      // Category section header row
+      const hdrTr = document.createElement('tr');
+      hdrTr.className = 'glo-cat-hdr';
+      const hdrTd = document.createElement('td');
+      hdrTd.colSpan = 3;
+      hdrTd.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${st.color};margin-right:8px;vertical-align:middle"></span><strong>${cat}</strong> <span style="font-size:11px;color:var(--mut);font-weight:400">(${items.length} ${items.length === 1 ? 'term' : 'terms'})</span>`;
+      hdrTr.appendChild(hdrTd);
+      frag.appendChild(hdrTr);
+
+      // Data rows
+      items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'glo-row';
+
+        // Category Badge TD
+        const tdCat = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'glo-badge';
+        badge.style.background = st.bg;
+        badge.style.color = st.color;
+        badge.style.border = `1px solid ${st.bdr}`;
+        badge.textContent = cat;
+        tdCat.appendChild(badge);
+
+        // Term TD
+        const tdTerm = document.createElement('td');
+        tdTerm.className = 'glo-term';
+        tdTerm.textContent = item.term || '';
+
+        // Definition TD
+        const tdDef = document.createElement('td');
+        tdDef.className = 'glo-def';
+        tdDef.textContent = item.definition || '';
+
+        tr.appendChild(tdCat);
+        tr.appendChild(tdTerm);
+        tr.appendChild(tdDef);
+        frag.appendChild(tr);
+      });
+    });
+
+    tbody.appendChild(frag);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // INITIAL RENDER
+  // ══════════════════════════════════════════════════════════════════════════
+
+  renderBoth();
+
+})();
+</script>
+</body>
+</html>

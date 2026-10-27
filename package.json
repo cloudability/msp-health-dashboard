@@ -1,0 +1,13 @@
+{
+  "name": "msp-health-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MSP & CCB Program Performance dashboard - build scripts and HTML template",
+  "scripts": {
+    "build": "node build/parse-data.js",
+    "review": "node build/make-data-review.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}

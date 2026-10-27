@@ -1,0 +1,21 @@
+# Dependencies - restored with `npm install`
+node_modules/
+
+# Weekly raw Excel exports and glossary (source data, not versioned)
+Source files/
+*.xlsx
+*.xls
+
+# Generated output - rebuilt with `npm run build`, distributed via Box
+Final/
+
+# Generated on demand by `npm run review`
+data-review.html
+
+# Superseded by git history
+build/Rollback Template Version/
+
+# Local tooling noise
+.DS_Store
+.bob/tmp/
+.bob/artifacts/
