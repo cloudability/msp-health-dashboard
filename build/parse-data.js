@@ -52,7 +52,9 @@ const COL = {
   IBM_CUST_NUM_MRGD:      'IBM_CUST_NUM_MRGD',
   IBM_CLIENT_NUM:         'IBM_CLIENT_NUM',    // absent in new export
   IBM_CLIENT_NAME:        'IBM_CLIENT_NAME',   // absent in new export
-  OWNER:                  'OWNER',
+  OWNER:                  'OWNER',             // absent in new export — replaced by TAM + PSM
+  TAM:                    'TAM',               // Technical Account Manager (replaces OWNER in new export)
+  PSM:                    'PSM',               // Partner Success Manager (new col)
 
   // Product
   FAMILY:                 'FAMILY',
@@ -81,7 +83,8 @@ const COL = {
   USD_COST:               'USD_COST',
   USD_ADJUSTED_COST:      'USD_ADJUSTED_COST',
   COST:                   'COST',
-  CURRENCY_CODE:          'CURRENCY_CODE',
+  CURRENCY_CODE:          'CURRENCY_CODE',     // col 14 — now always "USD" (billing currency)
+  CURRENCY:               'CURRENCY',          // col 39 — local/transaction currency (JPY, EUR, etc.)
 
   // Other
   COUNTRY:                'COUNTRY',
@@ -108,6 +111,10 @@ const COL = {
   CHANNEL:                'CHANNEL',           // col AU
   PART_NUMBER_TOP_BILL:   'PART_NUMBER_TOP_BILL',// col AV
   REVERSAL_FLAG:          'REVERSAL_FLAG',     // col BB
+  // TAM / PSM defined earlier (replaced OWNER)
+  // TAM and PSM are declared in the customer identifiers section above
+  CONTRACT_STATUS:        'CONTRACT_STATUS',   // ACTIVE | EXPIRED
+  SENTIMENT:              'SENTIMENT',         // customer sentiment: Green | Yellow | Red | blank (only some orgs are tracked)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,14 +202,21 @@ function fixMojibake(s) {
 }
 
 function cellVal(row, colIndex) {
-  if (!colIndex) return null;
-  const cell = row.getCell(colIndex);
-  if (cell.type === ExcelJS.ValueType.Error) return null;
-  const v = cell.value;
+  if (colIndex === null || colIndex === undefined) return null;
+  let v;
+  if (Array.isArray(row)) {
+    v = row[colIndex];
+  } else if (row && typeof row.getCell === 'function') {
+    const cell = row.getCell(colIndex);
+    if (cell.type === ExcelJS.ValueType.Error) return null;
+    v = cell.value;
+    if (typeof v === 'object' && v && v.richText) v = v.richText.map(r => r.text).join('');
+  } else {
+    return null;
+  }
   if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'object' && v.richText) return fixMojibake(v.richText.map(r => r.text).join(''));
   if (v instanceof Date) return v.toISOString().slice(0, 10);
-  if (typeof v === 'string') return fixMojibake(v);
+  if (typeof v === 'string') return fixMojibake(v.trim());
   return v;
 }
 
@@ -262,31 +276,76 @@ function addMonths(d, n) {
 // — these become SQL computed columns.
 //
 // buildDate:   the date the build script runs (TODAY() equivalent)
-// latestYM:    the max YEAR_MONTH value found across the whole file (passed in)
+// latestCompletedYM: the latest completed/closed YEAR_MONTH (e.g. Oct 2026 when snapshot is Nov 2026)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function computeFields(raw, buildDate, latestYM) {
+function determineLatestCompletedYM(allYMs, snapshotIsoDate, buildDate) {
+  if (!allYMs || allYMs.length === 0) return '';
+  const sortedYMs = [...new Set(allYMs)].filter(Boolean).sort();
+  if (sortedYMs.length === 0) return '';
+  const maxYM = sortedYMs[sortedYMs.length - 1];
+  const snapDateStr = snapshotIsoDate || buildDate || '';
+  const snapYM = snapDateStr.slice(0, 7); // e.g. '2026-11'
+
+  // If the max YEAR_MONTH in the file is equal to (or after) the snapshot's in-progress calendar month,
+  // that month represents partial/in-flight data. The latest completed month is the prior month.
+  if (snapYM && maxYM >= snapYM && sortedYMs.length > 1) {
+    const priorYMs = sortedYMs.filter(ym => ym < snapYM);
+    if (priorYMs.length > 0) {
+      return priorYMs[priorYMs.length - 1];
+    }
+  }
+  return maxYM;
+}
+
+// currentYM: the in-flight (month-to-date) YEAR_MONTH when the file holds one, i.e. the newest
+// YEAR_MONTH if it is later than latestCompletedYM. Otherwise it equals latestCompletedYM.
+function determineCurrentYM(latestYM, latestCompletedYM) {
+  return (latestYM && latestCompletedYM && latestYM > latestCompletedYM) ? latestYM : latestCompletedYM;
+}
+
+function computeFields(raw, buildDate, latestCompletedYM, currentYM) {
   // ── 1. isLatestMonth ──────────────────────────────────────────────────────
-  // TRUE if this row's YEAR_MONTH equals the maximum YEAR_MONTH in the file.
-  // Equivalent to: IF(A2=TEXT(MAX(DATEVALUE([YEAR_MONTH]&"-01")),"yyyy-mm"),TRUE,FALSE)
-  const isLatestMonth = raw.yearMonth === latestYM;
+  // TRUE if this row's YEAR_MONTH equals the latest completed YEAR_MONTH.
+  // Equivalent to: IF(A2=TEXT(MAX_COMPLETED([YEAR_MONTH]),"yyyy-mm"),TRUE,FALSE)
+  const isLatestMonth = raw.yearMonth === latestCompletedYM;
+
+  // ── 1b. isCurrentMonth ────────────────────────────────────────────────────
+  // TRUE if this row's YEAR_MONTH is the current (month-to-date) month. Falls back to the
+  // latest completed month when the file has no in-flight month.
+  const isCurrentMonth = raw.yearMonth === currentYM;
 
   // ── 2. tenureMonths ───────────────────────────────────────────────────────
   // Active contracts: DATEDIF(CONTRACT_START_DATE, TODAY(), "m")
   // Expired contracts (CONTRACT_END_DATE < buildDate): months covered by the contract.
   //
-  // DATEDIF "m" counts complete calendar-month crossings (e.g. Sep 1 → Sep 30 = 0).
-  // Contracts that run to the last day of their final month must be rounded up by 1
-  // so the full month is counted (e.g. Sep 1 → Sep 30 → 1 month, Jan 1 → Mar 31 → 3 months).
-  const contractIsExpired = raw.contractEnd && raw.contractEnd < buildDate;
+  // DATEDIF "m" counts complete calendar-month crossings and subtracts 1 when the end
+  // day-of-month hasn't yet reached the start day-of-month. This under-counts contracts
+  // that are commercially "N months" but end one day before the Nth-month anniversary.
+  //
+  // Round-up rule: add 1 when the effective end date is exactly one day before the
+  // start-day anniversary, i.e. endDay === startDay − 1 (or, when startDay === 1,
+  // endDay === last day of the end month — the existing end-of-month case).
+  //
+  // Examples that all become correct:
+  //   Sep 1  → Sep 30 : endDay(30) = lastDay(30)              → +1 → 1 month  ✓
+  //   Jan 1  → Mar 31 : endDay(31) = lastDay(31)              → +1 → 3 months ✓
+  //   Sep 16 → Sep 15 : endDay(15) = startDay(16) − 1         → +1 → 12 months ✓
+  //   Jan 2  → Dec 1  : endDay(1)  = startDay(2)  − 1         → +1 → 11 months ✓
+  //   Jan 15 → Mar 14 : endDay(14) = startDay(15) − 1         → +1 → 2 months  ✓
+  const contractIsExpired = raw.contractStatus ? raw.contractStatus === 'EXPIRED' : Boolean(raw.contractEnd && raw.contractEnd < buildDate);
   const tenureEndDate     = contractIsExpired ? raw.contractEnd : buildDate;
   let   tenureMonths      = datedifMonths(raw.contractStart, tenureEndDate);
-  if (contractIsExpired && tenureMonths !== null && raw.contractEnd) {
-    // Add 1 if the end date is the last day of its month (contract covers that full month)
-    const endD = parseDate(raw.contractEnd);
-    if (endD) {
-      const lastDayOfEndMonth = endOfMonth(endD).getUTCDate();
-      if (endD.getUTCDate() === lastDayOfEndMonth) tenureMonths += 1;
+  if (tenureMonths !== null && raw.contractStart) {
+    const startD    = parseDate(raw.contractStart);
+    const endD      = parseDate(tenureEndDate);
+    if (startD && endD) {
+      const sDay      = startD.getUTCDate();
+      const eDay      = endD.getUTCDate();
+      const eLastDay  = endOfMonth(endD).getUTCDate();
+      // One-day-before rule: end lands exactly 1 day before the start-day anniversary
+      const oneDayBefore = sDay === 1 ? eDay === eLastDay : eDay === sDay - 1;
+      if (oneDayBefore) tenureMonths += 1;
     }
   }
 
@@ -295,6 +354,7 @@ function computeFields(raw, buildDate, latestYM) {
   // Equivalent to:
   //   IF(ISNUMBER(SEARCH("MONTH",BY2)),"Monthly",
   //   IF(ISNUMBER(SEARCH("ANNUM",BY2)),"Annual",""))
+  //
   const pd = (raw.partDesc || '').toUpperCase();
   const contractType = pd.includes('MONTH') ? 'Monthly'
                      : pd.includes('ANNUM') ? 'Annual'
@@ -323,35 +383,27 @@ function computeFields(raw, buildDate, latestYM) {
   // ── 5. committedAmount ───────────────────────────────────────────────────
   // Calculates a committed spend figure based on type, contract type, and customer name.
   // Equivalent to:
-  //   IF(MSP_OR_CCB="CCB",          PART_QTY * 100000,
   //   IF(ContractType="Monthly",    PART_QTY * 1000,
-  //   IF(LEFT(NAME,14)="DXC Technology", PART_QTY * 1000,   -- e.g. "DXC Technology Services - FinOps"
-  //   IF(ContractType="Annual",     PART_QTY * 100000, 0))))
+  //   IF(OR(MSP_OR_CCB="CCB", ContractType="Annual"), PART_QTY * 100000, 0))
+  // A Monthly contract is always qty x 1,000, including CCB orgs (confirmed with the business).
   const qty = Number(raw.partQty) || 0;
   let committedAmount = 0;
-  if (raw.type === 'CCB') {
-    committedAmount = qty * 100000;
-  } else if (contractType === 'Monthly') {
+  if (contractType === 'Monthly') {
     committedAmount = qty * 1000;
-  } else if (String(raw.name || '').startsWith('DXC Technology')) {
-    committedAmount = qty * 1000;
-  } else if (contractType === 'Annual') {
+  } else if (raw.type === 'CCB' || contractType === 'Annual') {
     committedAmount = qty * 100000;
   }
 
   // ── 6. isL12Months ───────────────────────────────────────────────────────
-  // TRUE if YEAR_MONTH falls within the 12-month window ending today.
-  // Equivalent to:
-  //   --AND(DATEVALUE(A2&"-01") >= EDATE(TODAY(),-12),
-  //         DATEVALUE(A2&"-01") <= EOMONTH(TODAY(),0))
+  // TRUE if YEAR_MONTH falls within the 12 months ending with currentYM (the current month is the 12th).
+  // (e.g. 2025-12 through 2026-11 when currentYM is 2026-11).
   let isL12Months = false;
-  if (raw.yearMonth) {
-    const ymDate    = parseDate(raw.yearMonth);
-    const today     = parseDate(buildDate);
-    if (ymDate && today) {
-      const windowStart = addMonths(today, -12);  // EDATE(TODAY(), -12)
-      const windowEnd   = endOfMonth(today);       // EOMONTH(TODAY(), 0)
-      isL12Months = ymDate >= windowStart && ymDate <= windowEnd;
+  if (raw.yearMonth && currentYM) {
+    const l12End = parseDate(currentYM);
+    if (l12End) {
+      const l12Start = addMonths(l12End, -11);
+      const startYM = l12Start.toISOString().slice(0, 7);
+      isL12Months = raw.yearMonth >= startYM && raw.yearMonth <= currentYM;
     }
   }
 
@@ -360,7 +412,7 @@ function computeFields(raw, buildDate, latestYM) {
   // Equivalent to: IF([@END_CONSUMER_NAME]="","",[@END_CONSUMER_NAME])
   const endConsumerName2 = raw.endConsumerName || null;
 
-  return { isLatestMonth, tenureMonths, contractType, configuredCSum,
+  return { isLatestMonth, isCurrentMonth, tenureMonths, contractType, configuredCSum,
            committedAmount, isL12Months, endConsumerName2 };
 }
 
@@ -370,17 +422,18 @@ function computeFields(raw, buildDate, latestYM) {
 
 /**
  * parseRow extracts raw column values.
- * Computed fields are added afterwards by computeFields() once latestYM is known.
- * buildDate and latestYM are passed in from main().
+ * Computed fields are added afterwards by computeFields() once latestCompletedYM and currentYM are known.
+ * buildDate, latestCompletedYM and currentYM are passed in from main().
  */
-function parseRow(row, hdr, buildDate, latestYM) {
+function parseRow(row, hdr, buildDate, latestCompletedYM, currentYM) {
   const g = k => {
     const idx = hdr[k];
-    return idx ? cellVal(row, idx) : null;
+    return (idx !== undefined && idx !== null) ? cellVal(row, idx) : null;
   };
 
   // Skip inactive rows
-  if (g(COL.INACT_FLAG) === 1 || g(COL.INACT_FLAG) === true) return null;
+  const inact = g(COL.INACT_FLAG);
+  if (inact === 1 || inact === true || inact === '1' || inact === 'true') return null;
 
   const raw = {
     // Time
@@ -409,7 +462,9 @@ function parseRow(row, hdr, buildDate, latestYM) {
     ibmCustNum:         g(COL.IBM_CUST_NUM_MRGD),
     ibmClientNum:       g(COL.IBM_CLIENT_NUM),
     ibmClientName:      g(COL.IBM_CLIENT_NAME),
-    owner:              g(COL.OWNER),
+    owner:              g(COL.OWNER) || g(COL.TAM),   // OWNER absent in new export; fall back to TAM
+    tam:                g(COL.TAM),
+    psm:                g(COL.PSM),
 
     // Product
     family:             g(COL.FAMILY),
@@ -439,7 +494,7 @@ function parseRow(row, hdr, buildDate, latestYM) {
     // Cloud cost
     usdCost:         Number(g(COL.USD_COST))          || 0,
     usdAdjustedCost: Number(g(COL.USD_ADJUSTED_COST)) || 0,
-    currencyCode:    g(COL.CURRENCY_CODE),
+    currencyCode:    g(COL.CURRENCY) || g(COL.CURRENCY_CODE),  // CURRENCY (col 39) = local currency; CURRENCY_CODE (col 14) = billing USD
 
     // Meta
     country:      g(COL.COUNTRY),
@@ -447,7 +502,7 @@ function parseRow(row, hdr, buildDate, latestYM) {
 
     // Raw columns needed only for computed fields (not surfaced directly)
     partQty: g(COL.PART_QTY),
-    name:    g(COL.NAME),
+    name:    g(COL.NAME) || g(COL.CUSTOMER_NAME_FULL_MRGD) || g(COL.CUSTOMER_NAME),
 
     // Additional fields (may be absent in newer exports — gracefully null)
     custNameFullReseller: g(COL.CUST_NAME_FULL_RESELLER),
@@ -462,10 +517,160 @@ function parseRow(row, hdr, buildDate, latestYM) {
     channel:             g(COL.CHANNEL),
     partNumberTopBill:   g(COL.PART_NUMBER_TOP_BILL),
     reversalFlag:        g(COL.REVERSAL_FLAG),
+    contractStatus:      g(COL.CONTRACT_STATUS),
+    sentiment:           g(COL.SENTIMENT),
   };
 
   // Attach computed fields
-  return Object.assign(raw, computeFields(raw, buildDate, latestYM));
+  return Object.assign(raw, computeFields(raw, buildDate, latestCompletedYM, currentYM));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Active Management Orgs view (V_SSABL_MSP_ACTIVE) filter
+//
+// The Excel export can carry more than one contract line per org that is
+// "active by date" (overlapping/duplicate contracts). The Snowflake view
+// lists exactly one current contract per org. When a view CSV is present in
+// "Source files/Active Orgs/", an active-by-date row is kept only if its
+// DOMESTIC_CLIENT_ID + CONTRACT_START_DATE + CONTRACT_END_DATE is in the view.
+// Expired / historical rows are never touched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ACTIVE_VIEW_DIR = 'Active Orgs';
+
+/** Minimal RFC-4180 CSV parser (quoted fields, escaped quotes, CRLF, BOM). */
+function parseCsv(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false;
+      } else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/** Date of a view file: dd_mm_yy in the name (e.g. Active_Management_Orgs_26_10_26.csv), else mtime. */
+function extractViewDate(filename, mtime) {
+  const m = filename.match(/(\d{2})[_-](\d{2})[_-](\d{2})(?!\d)/);
+  if (m) return `20${m[3]}-${m[2]}-${m[1]}`;
+  return mtime.toISOString().slice(0, 10);
+}
+
+/** Newest view CSV in Source files/Active Orgs/ (subfolders ignored), or null. */
+function findActiveViewFile(sourceDir) {
+  const dir = path.join(sourceDir, ACTIVE_VIEW_DIR);
+  if (!fs.existsSync(dir)) return null;
+  const files = fs.readdirSync(dir)
+    .filter(f => /\.csv$/i.test(f) && !f.startsWith('~$'))
+    .map(f => {
+      const full = path.join(dir, f);
+      const st = fs.statSync(full);
+      return { filename: f, fullPath: full, isoDate: extractViewDate(f, st.mtime), mtime: st.mtimeMs };
+    })
+    .sort((a, b) => b.isoDate.localeCompare(a.isoDate) || b.mtime - a.mtime);
+  return files[0] || null;
+}
+
+const viewKey = (id, start, end) =>
+  `${String(id || '').trim()}|${String(start || '').slice(0, 10)}|${String(end || '').slice(0, 10)}`;
+
+/** Load the view CSV -> { file, keys:Set, rows:[{key,name,id,start,end}] } */
+function loadActiveView(file) {
+  const table = parseCsv(fs.readFileSync(file.fullPath, 'utf8'));
+  const head = table[0].map(h => h.trim().toUpperCase());
+  const ix = n => head.indexOf(n);
+  const need = ['DOMESTIC_CLIENT_ID', 'CONTRACT_START_DATE', 'CONTRACT_END_DATE'];
+  const missing = need.filter(n => ix(n) < 0);
+  if (missing.length) throw new Error(`missing column(s): ${missing.join(', ')}`);
+  const rows = table.slice(1).map(r => {
+    const id = (r[ix('DOMESTIC_CLIENT_ID')] || '').trim();
+    const start = (r[ix('CONTRACT_START_DATE')] || '').trim().slice(0, 10);
+    const end = (r[ix('CONTRACT_END_DATE')] || '').trim().slice(0, 10);
+    const name = ix('CUSTOMER_NAME_FULL_MRGD') >= 0 ? (r[ix('CUSTOMER_NAME_FULL_MRGD')] || '').trim() : id;
+    return { key: viewKey(id, start, end), id, start, end, name };
+  }).filter(r => r.id);
+  return { file, rows, keys: new Set(rows.map(r => r.key)) };
+}
+
+/**
+ * Drop active-by-date rows that are not a current contract in the view.
+ * Returns { kept, dropped, report } — report is printed by the caller.
+ */
+function applyActiveViewFilter(records, snapshotDate, view) {
+  const kept = [];
+  const orgs = new Map();   // id -> { name, before, after, dropped, months:Set }
+  const matchedKeys = new Set();
+  const activeOrgIds = new Set();
+  const getOrg = r => {
+    const id = r.domesticClientId || '(no id)';
+    if (!orgs.has(id)) orgs.set(id, { id, name: r.customerNameFull || r.managementOrgName || r.name || id, before: 0, after: 0, dropped: 0, months: new Set() });
+    return orgs.get(id);
+  };
+
+  for (const r of records) {
+    const o = getOrg(r);
+    const csum = Number(r.configuredCSum) || 0;
+    o.before += csum;
+    const start = String(r.contractStart || '').slice(0, 10);
+    const end = String(r.contractEnd || '').slice(0, 10);
+    const activeByDate = start && end && start <= snapshotDate && snapshotDate <= end;
+    if (activeByDate) activeOrgIds.add(r.domesticClientId || '(no id)');
+    const key = viewKey(r.domesticClientId, start, end);
+    if (!activeByDate || view.keys.has(key)) {
+      if (activeByDate) matchedKeys.add(key);
+      kept.push(r);
+      o.after += csum;
+    } else {
+      o.dropped++;
+      if (r.yearMonth) o.months.add(String(r.yearMonth).slice(0, 7));
+    }
+  }
+
+  const changed = [...orgs.values()].filter(o => o.dropped > 0).sort((a, b) => (b.before - b.after) - (a.before - a.after));
+  const orgsWithNoKeptActive = changed.filter(o => !kept.some(r => (r.domesticClientId || '(no id)') === o.id &&
+    String(r.contractStart || '').slice(0, 10) <= snapshotDate && snapshotDate <= String(r.contractEnd || '').slice(0, 10)));
+  const unmatchedView = view.rows.filter(v => !matchedKeys.has(v.key));
+  return { kept, changed, orgsWithNoKeptActive, unmatchedView, activeOrgCount: activeOrgIds.size };
+}
+
+function printActiveViewReport(res, view, snapshotDate, droppedTotal) {
+  const money = n => '$' + Math.round(n).toLocaleString('en-US');
+  console.log(`  Active-orgs view: ${view.file.filename} (view date ${view.file.isoDate}), ${view.rows.length} contract rows`);
+  if (view.file.isoDate !== snapshotDate) {
+    console.log(`  WARNING: view date ${view.file.isoDate} differs from export snapshot ${snapshotDate} — make sure both were pulled together.`);
+  }
+  console.log(`  Active-by-date orgs in data: ${res.activeOrgCount}; rows dropped (not current in view): ${droppedTotal}`);
+  if (res.changed.length) {
+    console.log('  Reconciliation (orgs with dropped rows):');
+    let b = 0, a = 0;
+    for (const o of res.changed) {
+      b += o.before; a += o.after;
+      const ms = [...o.months].sort();
+      console.log(`    - ${o.name}: ${o.dropped} rows dropped, CSUM ${money(o.before)} -> ${money(o.after)}, months ${ms[0]}..${ms[ms.length - 1]} (${ms.length})`);
+    }
+    console.log(`    Total CSUM across affected orgs: ${money(b)} -> ${money(a)} (${money(a - b)})`);
+  }
+  if (res.orgsWithNoKeptActive.length) {
+    console.log('  WARNING: these orgs are active by date in the data but have NO contract in the view, so all their active rows were dropped:');
+    res.orgsWithNoKeptActive.forEach(o => console.log(`    - ${o.name} (${o.id})`));
+  }
+  if (res.unmatchedView.length) {
+    console.log('  WARNING: view contracts with no matching rows in the export (check IDs/dates):');
+    res.unmatchedView.forEach(v => console.log(`    - ${v.name} (${v.id}) ${v.start} -> ${v.end}`));
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -491,7 +696,7 @@ async function main() {
   }
 
   const allFiles = fs.readdirSync(sourceDir)
-    .filter(f => /\.(xlsx|xls)$/i.test(f) && !/glossary/i.test(f))
+    .filter(f => /\.(xlsx|xls|csv)$/i.test(f) && !/glossary/i.test(f) && !f.startsWith('~$'))
     .map(f => {
       const fullPath = path.join(sourceDir, f);
       const stat     = fs.statSync(fullPath);
@@ -501,7 +706,7 @@ async function main() {
     .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
 
   if (allFiles.length === 0) {
-    console.log('WARNING: No Excel files found in Source files/. Build will produce an empty dashboard.');
+    console.log('WARNING: No data files (.csv, .xlsx) found in Source files/. Build will produce an empty dashboard.');
   }
 
   // Apply MAX_WEEKS cap
@@ -523,84 +728,161 @@ async function main() {
    * independent of snapshotDate (which is when the file was pulled).
    */
   const weeklySnapshots = [];
+
+  // Optional: current-contract list from the V_SSABL_MSP_ACTIVE view export
+  let activeView = null;
+  const activeViewFile = findActiveViewFile(sourceDir);
+  if (activeViewFile) {
+    try {
+      activeView = loadActiveView(activeViewFile);
+    } catch (err) {
+      console.log(`ERROR: Could not read active-orgs view ${activeViewFile.filename}: ${err.message}`);
+      process.exit(1);
+    }
+  }
   let totalRecords = 0;
   let skippedRows  = 0;
 
   for (const file of files) {
     console.log(`Parsing [${file.isoDate}] ${file.filename} …`);
-    const workbook = new ExcelJS.Workbook();
+    const records = [];
+    const isCsv = /\.csv$/i.test(file.filename);
 
-    try {
-      await workbook.xlsx.readFile(file.fullPath);
-    } catch (err) {
-      console.log(`  WARNING: Could not read file — skipping. (${err.message})`);
-      continue;
-    }
-
-    // Find the worksheet that contains the expected columns.
-    // The export may place data on a sheet other than Sheet1 (e.g. prd_ods_cloudability_msp_*).
-    let ws = null;
-    let hdr = {};
-    for (const sheet of workbook.worksheets) {
-      const candidateHdr = {};
-      sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, col) => {
-        const key = String(cell.value ?? '').trim();
-        if (key) candidateHdr[key] = col;
+    if (isCsv) {
+      let content;
+      try {
+        content = fs.readFileSync(file.fullPath, 'utf8');
+      } catch (err) {
+        console.log(`  WARNING: Could not read CSV file — skipping. (${err.message})`);
+        continue;
+      }
+      const rows = parseCsv(content);
+      if (!rows.length) {
+        console.log('  WARNING: CSV file is empty — skipping.');
+        continue;
+      }
+      const hdr = {};
+      rows[0].forEach((cell, idx) => {
+        const key = String(cell ?? '').trim().replace(/^\uFEFF/, '');
+        if (key) hdr[key] = idx;
       });
       const requiredCols = [COL.YEAR_MONTH, COL.SAAS_ACV_USD_AT_PLAN, COL.MSP_OR_CCB];
-      if (requiredCols.every(c => candidateHdr[c])) {
-        ws = sheet;
-        hdr = candidateHdr;
-        console.log(`  Using worksheet: "${sheet.name}"`);
-        break;
+      const missing = requiredCols.filter(c => hdr[c] === undefined);
+      if (missing.length) {
+        console.log(`  WARNING: CSV missing required columns (${missing.join(', ')}) — skipping file.`);
+        continue;
       }
-    }
-    if (!ws) {
-      // Build list of missing columns for the most-promising sheet (most headers matched)
-      const allHdrs = {};
-      workbook.worksheets.forEach(sheet =>
+
+      // Pass 1: find all distinct YMs and determine latest completed YM
+      const ymCol = hdr[COL.YEAR_MONTH];
+      const allYMs = [];
+      let latestYM = '';
+      for (let i = 1; i < rows.length; i++) {
+        const v = cellVal(rows[i], ymCol);
+        if (v) {
+          const strV = String(v);
+          allYMs.push(strV);
+          if (strV > latestYM) latestYM = strV;
+        }
+      }
+      const latestCompletedYM = determineLatestCompletedYM(allYMs, file.isoDate, buildDate);
+      const currentYM = determineCurrentYM(latestYM, latestCompletedYM);
+      console.log(`  Latest YEAR_MONTH in file: ${latestYM || '(none)'} (latest completed: ${latestCompletedYM || '(none)'}, current: ${currentYM || '(none)'})`);
+
+      // Pass 2: parse rows
+      for (let i = 1; i < rows.length; i++) {
+        const rec = parseRow(rows[i], hdr, buildDate, latestCompletedYM, currentYM);
+        if (rec) records.push(rec);
+        else skippedRows++;
+      }
+    } else {
+      const workbook = new ExcelJS.Workbook();
+      try {
+        await workbook.xlsx.readFile(file.fullPath);
+      } catch (err) {
+        console.log(`  WARNING: Could not read file — skipping. (${err.message})`);
+        continue;
+      }
+
+      // Find the worksheet that contains the expected columns.
+      let ws = null;
+      let hdr = {};
+      for (const sheet of workbook.worksheets) {
+        const candidateHdr = {};
         sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, col) => {
           const key = String(cell.value ?? '').trim();
-          if (key) allHdrs[key] = col;
-        })
-      );
-      const missing = [COL.YEAR_MONTH, COL.SAAS_ACV_USD_AT_PLAN, COL.MSP_OR_CCB].filter(c => !allHdrs[c]);
-      console.log(`  WARNING: No worksheet found with required columns (${missing.join(', ')}) — skipping file.`);
-      continue;
+          if (key) candidateHdr[key] = col;
+        });
+        const requiredCols = [COL.YEAR_MONTH, COL.SAAS_ACV_USD_AT_PLAN, COL.MSP_OR_CCB];
+        if (requiredCols.every(c => candidateHdr[c])) {
+          ws = sheet;
+          hdr = candidateHdr;
+          console.log(`  Using worksheet: "${sheet.name}"`);
+          break;
+        }
+      }
+      if (!ws) {
+        const allHdrs = {};
+        workbook.worksheets.forEach(sheet =>
+          sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, col) => {
+            const key = String(cell.value ?? '').trim();
+            if (key) allHdrs[key] = col;
+          })
+        );
+        const missing = [COL.YEAR_MONTH, COL.SAAS_ACV_USD_AT_PLAN, COL.MSP_OR_CCB].filter(c => !allHdrs[c]);
+        console.log(`  WARNING: No worksheet found with required columns (${missing.join(', ')}) — skipping file.`);
+        continue;
+      }
+
+      // Pass 1: determine latest completed YM
+      const ymCol = hdr[COL.YEAR_MONTH];
+      const allYMs = [];
+      let latestYM = '';
+      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+        if (rowNum === 1) return;
+        const v = cellVal(row, ymCol);
+        if (v) {
+          const strV = String(v);
+          allYMs.push(strV);
+          if (strV > latestYM) latestYM = strV;
+        }
+      });
+      const latestCompletedYM = determineLatestCompletedYM(allYMs, file.isoDate, buildDate);
+      const currentYM = determineCurrentYM(latestYM, latestCompletedYM);
+      console.log(`  Latest YEAR_MONTH in file: ${latestYM || '(none)'} (latest completed: ${latestCompletedYM || '(none)'}, current: ${currentYM || '(none)'})`);
+
+      // Pass 2: parse rows
+      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+        if (rowNum === 1) return;
+        const rec = parseRow(row, hdr, buildDate, latestCompletedYM, currentYM);
+        if (rec) records.push(rec);
+        else skippedRows++;
+      });
     }
 
-    // Validate expected columns exist (hdr already confirmed above)
-    const missing = [];  // already validated — kept for any future checks
-
-    // ── Pass 1: collect all YEAR_MONTH values to determine latestYM ──────────
-    const ymCol = hdr[COL.YEAR_MONTH];
-    let latestYM = '';
-    ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
-      if (rowNum === 1) return;
-      const v = cellVal(row, ymCol);
-      if (v && String(v) > latestYM) latestYM = String(v);
-    });
-    console.log(`  Latest YEAR_MONTH in file: ${latestYM || '(none)'}`);
-
-    // ── Pass 2: parse rows with computed fields ───────────────────────────────
-    const records = [];
-    ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
-      if (rowNum === 1) return; // header
-      const rec = parseRow(row, hdr, buildDate, latestYM);
-      if (rec) {
-        records.push(rec);
-      } else {
-        skippedRows++;
-      }
-    });
-
     console.log(`  Rows: ${records.length} parsed, ${skippedRows} skipped (inactive/empty)`);
-    totalRecords += records.length;
+
+    // Check if CONTRACT_STATUS column is provided in the export data
+    const hasContractStatus = records.some(r => r.contractStatus);
+    let finalRecords = records;
+
+    if (hasContractStatus) {
+      const activeCount = records.filter(r => r.contractStatus === 'ACTIVE').length;
+      const expiredCount = records.filter(r => r.contractStatus === 'EXPIRED').length;
+      console.log(`  Active tracking: Using CONTRACT_STATUS from export (${activeCount} active rows, ${expiredCount} expired rows).`);
+    } else if (activeView && file === files[files.length - 1]) {
+      const res = applyActiveViewFilter(records, file.isoDate, activeView);
+      printActiveViewReport(res, activeView, file.isoDate, records.length - res.kept.length);
+      finalRecords = res.kept;
+    } else if (!activeView) {
+      console.log('  WARNING: No CONTRACT_STATUS column and no active-orgs view CSV — overlapping contracts will not be filtered.');
+    }
+    totalRecords += finalRecords.length;
 
     weeklySnapshots.push({
       snapshotDate: file.isoDate,
       filename:     file.filename,
-      records,
+      records:      finalRecords,
     });
   }
 
@@ -679,7 +961,7 @@ async function main() {
     weeklySnapshots,
   };
 
-  const dataScript = `window.__MSP_DATA__ = ${JSON.stringify(dashboardData)};`;
+  const dataScript = `window.__MSP_DATA__ = ${JSON.stringify(dashboardData)};\n`;
 
   // ── 5. Inject into template ────────────────────────────────────────────────
 
@@ -722,7 +1004,12 @@ async function main() {
   console.log('─────────────────────────────────────────────────────');
 }
 
-main().catch(err => {
-  console.log('Build failed:', err);
-  process.exit(1);
-});
+// Run the build only when executed directly (node build/parse-data.js);
+// build/update.js requires this file just to reuse extractDate().
+if (require.main === module) {
+  main().catch(err => {
+    console.log('Build failed:', err);
+    process.exit(1);
+  });
+}
+module.exports = { extractDate, findActiveViewFile, ACTIVE_VIEW_DIR };

@@ -14,7 +14,7 @@ This file provides guidance to agents when working with code in this repository.
 
 - **`buildMgmtOrgs()` deduplicates CSUM** via `csumCurrentSeen` / `csumLifetimeSeen` Maps keyed on `endConsumerName|vendor|configuredCSum`. New management-table metrics must follow the same pattern or totals will be inflated.
 
-- **`poTableFilter.yearMonth` defaults to the latest YM** (set in `populatePoFilterDropdowns`). Filter state lives in `poTableFilter`. Mutate it and call `renderMgmtTable(rows)`.
+- **`poTableFilter.yearMonth` defaults to the current month** (the `isCurrentMonth` YM, set where `poTableFilter` is declared) and is changed by the table-only "Reporting Month" dropdown `#po-f-yearmonth` (last 12 months, filled in `populatePoFilterDropdowns`). KPIs and charts ignore it. Filter state lives in `poTableFilter`. Mutate it and call `renderMgmtTable(rows)`.
 
 - **CSS variables only** for colours (`:root`: `--blu`, `--grn`, `--red`, `--yel`, `--pur`, `--teal`, `--mut`, `--sur`, `--sur2`, `--bdr`, `--txt`, `--bg`). The one exception is the status palette (`UTIL_STATUS_COLORS`, `.status-*`).
 

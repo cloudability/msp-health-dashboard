@@ -1,9 +1,9 @@
 {
-  "name": "msp-health-dashboard",
+  "name": "msp-dashboard",
   "version": "1.0.0",
-  "private": true,
-  "description": "MSP & CCB Program Performance dashboard - build scripts and HTML template",
+  "description": "MSP Reporting Dashboard — weekly Excel ingestion → self-contained HTML",
   "scripts": {
+    "update": "node build/update.js",
     "build": "node build/parse-data.js",
     "review": "node build/make-data-review.js"
   },

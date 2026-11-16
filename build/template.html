@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -51,14 +51,25 @@
 
     /* ── Snapshot info bar ───────────────────────────────────────────────── */
     #snap-bar {
-      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+      display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;
       background: var(--sur); border: 1px solid var(--bdr);
       border-radius: 4px; padding: 8px 16px; margin-bottom: 20px;
     }
-    #snap-bar .filter-scope-note {
-      margin-left: auto; font-size: 10px; color: var(--mut);
-      line-height: 1.4; max-width: 160px; text-align: right;
+    #snap-bar .po-fgrp { display: flex; gap: 16px; align-items: flex-end; }
+    #snap-bar .po-fgrp-table {
+      display: grid; grid-auto-flow: column; grid-template-rows: auto auto; align-items: end;
+      column-gap: 16px; row-gap: 6px; padding-left: 16px; border-left: 1px solid var(--bdr);
     }
+    #snap-bar .po-fgrp-cap {
+      grid-column: 1 / -1; grid-row: 1; font-size: 10px; font-weight: 600; letter-spacing: .03em;
+      text-transform: uppercase; color: var(--mut);
+    }
+    #snap-bar .po-fgrp-table .po-fc { grid-row: 2; }
+    #snap-bar .po-fnote {
+      display: flex; align-items: flex-start; gap: 6px; margin-left: auto; max-width: 340px;
+      font-size: 12px; line-height: 1.4; color: var(--mut); text-align: left;
+    }
+    #snap-bar .po-fnote .po-l12-icon { margin-top: 1px; }
 
     /* ── KPI cards ──────────────────────────────────────────────────────── */
     .kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -70,6 +81,26 @@
     .kpi-label { font-size: 11px; color: var(--mut); font-weight: 600;
       letter-spacing: 0.01em; margin-bottom: 10px; line-height: 1.4; }
     .kpi-value { font-size: 28px; font-weight: 300; line-height: 1; color: var(--blu-40); }
+    .kpi-card { position: relative; }
+    .kpi-card.narrow { flex: 0.75; }   /* the three Active Orgs cards; frees width so the longer label of the card to the right doesn't wrap */
+    .kpi-card.wide   { flex: 1.04; }   /* "Management Orgs with Active End Consumers (%)": keeps its label on two lines so the value lines up with its neighbours */
+    .kpi-card.has-tip .kpi-label { padding-right: 22px; }
+    .kpi-tip { position: absolute; top: 12px; right: 12px; }
+    .kpi-tip-btn {
+      position: relative; width: 15px; height: 15px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1.5px solid var(--mut); border-radius: 50%; background: transparent; color: var(--mut);
+      font: italic 700 10px/1 Georgia, 'Times New Roman', serif; cursor: help;
+    }
+    .kpi-tip-btn::before { content: ''; position: absolute; inset: -6px; }
+    .kpi-tip:hover .kpi-tip-btn, .kpi-tip-btn:focus-visible { border-color: var(--blu); color: var(--blu); }
+    .kpi-tip-btn:focus-visible { outline: 2px solid var(--blu); outline-offset: 2px; }
+    .kpi-tip-text {
+      display: none; position: absolute; top: calc(100% + 8px); right: -8px; z-index: 50;
+      width: 210px; padding: 8px 10px; border-radius: 4px; background: var(--txt); color: var(--bg);
+      font-size: 12px; font-weight: 400; line-height: 1.4; text-align: left; pointer-events: none;
+    }
+    .kpi-tip:hover .kpi-tip-text, .kpi-tip:focus-within .kpi-tip-text { display: block; }
     .kpi-delta { font-size: 11px; margin-top: 5px; }
     .kpi-delta.pos { color: var(--grn); }
     .kpi-delta.neg { color: var(--red); }
@@ -94,6 +125,14 @@
       max-width: 220px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
     }
     .mgmt-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    /* Name / TAM / PSM: fixed content width; longer text scrolls sideways inside the cell */
+    .mgmt-table .cell-scroll {
+      width: 75px; max-width: 75px; overflow-x: auto; overflow-y: hidden; white-space: nowrap;
+      scrollbar-width: thin;
+    }
+    .mgmt-table .cell-scroll.name-scroll { width: 200px; max-width: 200px; }
+    .mgmt-table .cell-scroll::-webkit-scrollbar { height: 4px; }
+    .mgmt-table .cell-scroll::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 2px; }
     .util-bar-cell { min-width: 110px; }
     .util-bar-wrap { display: flex; align-items: center; gap: 6px; }
     .util-bar-bg { flex: 1; height: 6px; background: var(--sur2); border-radius: 3px; overflow: hidden; min-width: 50px; }
@@ -137,6 +176,8 @@
       min-width: 100px; max-width: 180px;
     }
     .po-fc select:focus, .po-fc input[type=text]:focus { outline: 2px solid var(--blu); outline-offset: 1px; }
+    .po-fc .po-fc-static { font-size: 12px; font-weight: 600; color: var(--txt); padding: 5px 0; white-space: nowrap; }
+    .po-fc .po-fc-static span { font-weight: 400; color: var(--mut); }
 
     /* ── Util cell highlighting — mirrors status badge backgrounds exactly ── */
     td.util-cell-over     { background: rgba(105,41,196,.12)  !important; }   /* > 100%  Over Util  purple  */
@@ -174,6 +215,13 @@
     .iov-combo-option:hover, .iov-combo-option.active { background: var(--sur2); }
     .iov-combo-option.selected { font-weight: 600; color: var(--blu); }
     .iov-combo-empty { padding: 7px 10px; font-size: 12px; color: var(--mut); font-style: italic; }
+    /* Program Overview Name filter — same combobox as Individual Org View, sized like the other filters */
+    .po-combo { min-width: 180px; width: 180px; }
+    .po-combo .iov-combo-input {
+      background: var(--sur2); font-size: 12px; padding: 4px 22px 4px 8px; cursor: text;
+    }
+    .po-combo .iov-combo-list { right: auto; min-width: 320px; }
+    .po-combo .iov-combo-option { font-size: 12px; }
     .iov-timeframe { margin-left: auto; min-width: 320px; }
     .iov-timeframe label { font-size: 12px; color: var(--mut); font-weight: 500; }
     .iov-range-wrap {
@@ -240,6 +288,28 @@
     .chart-box canvas { width: 100% !important; max-height: 260px; }
     /* End-consumer bar chart sizes itself (see iovApplyEcLayout) and scrolls inside its wrapper */
     .chart-box canvas#iov-chart-csum-ec { max-height: none; }
+
+    /* DXC Regional button selector */
+    .iov-dxc-btn {
+      background: var(--sur);
+      border: 1px solid var(--bdr);
+      border-radius: 4px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--txt);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .iov-dxc-btn:hover {
+      background: var(--sur2);
+    }
+    .iov-dxc-btn.active {
+      background: var(--blu);
+      color: #ffffff;
+      border-color: var(--blu);
+      font-weight: 600;
+    }
 
     /* ── Section ─────────────────────────────────────────────────────────── */
     .section { margin-bottom: 28px; }
@@ -389,6 +459,104 @@
       border-radius: 50%; animation: iov-spin .7s linear infinite;
     }
     @keyframes iov-spin { to { transform: rotate(360deg); } }
+
+    /* ── Program Overview: last-12-months note ───────────────────────────── */
+    .po-l12-note {
+      display: flex; align-items: center; justify-content: flex-start; gap: 6px;
+      margin: 12px 0; font-size: 12px; color: var(--mut); text-align: left;
+    }
+    .po-l12-icon {
+      display: inline-flex; align-items: center; justify-content: center; flex: none;
+      width: 15px; height: 15px; border: 1.5px solid var(--mut); border-radius: 50%;
+      font: italic 700 10px/1 Georgia, 'Times New Roman', serif;
+    }
+
+    /* ── Status & Utilization % logic pop-up (lm-) ───────────────────────── */
+    .lm-info-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; margin-left: 5px; padding: 0; vertical-align: middle;
+      border: 1.5px solid var(--mut); border-radius: 50%; background: transparent; color: var(--mut);
+      font: italic 700 10px/1 Georgia, 'Times New Roman', serif; cursor: pointer;
+    }
+    .lm-info-btn { position: relative; }
+    .lm-info-btn::before { content: ''; position: absolute; inset: -6px; }   /* ~27px click target around the 15px icon */
+    .lm-info-btn:hover { border-color: var(--blu); color: var(--blu); }
+    .lm-info-btn:focus-visible, .lm-close:focus-visible, .lm-link:focus-visible, .lm-close-btn:focus-visible {
+      outline: 2px solid var(--blu); outline-offset: 2px;
+    }
+    #lm-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9500;
+      background: rgba(31,35,40,.55); align-items: center; justify-content: center;
+    }
+    #lm-overlay.visible { display: flex; }
+    #lm-dialog {
+      background: var(--bg); border: 1px solid var(--bdr); border-radius: 8px;
+      width: min(840px, 96vw); max-height: 92vh; display: flex; flex-direction: column;
+      box-shadow: 0 12px 40px rgba(0,0,0,.22);
+    }
+    .lm-head {
+      padding: 14px 24px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .lm-head h2 { font-size: 17px; font-weight: 600; color: var(--txt); }
+    .lm-close {
+      width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      border: none; background: transparent; color: var(--mut); font-size: 22px; line-height: 1;
+      cursor: pointer; padding: 0; border-radius: 4px;
+    }
+    .lm-close:hover { color: var(--txt); background: var(--sur2); }
+    .lm-link {
+      border: none; background: none; padding: 0; font: inherit; font-size: 13px; color: var(--blu-40);
+      cursor: pointer; text-decoration: underline;
+    }
+    #lm-body { padding: 4px 24px 20px; overflow-y: auto; flex: 1 1 auto; font-size: 13px; line-height: 1.5; color: var(--txt); }
+    #lm-body h3 {
+      font-size: 14px; font-weight: 600; color: var(--txt);
+      margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--bdr);
+    }
+    #lm-body h4 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+    #lm-body h3 + h4 { margin-top: 0; }
+    #lm-body p { margin: 6px 0; }
+    #lm-body ul { margin: 6px 0 0 18px; }
+    #lm-body li { margin: 4px 0; }
+    .lm-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+    .lm-tiles.lm-tiles-2 { grid-template-columns: repeat(2, 1fr); margin-top: 10px; }
+    @media (max-width: 640px) { .lm-tiles, .lm-tiles.lm-tiles-2 { grid-template-columns: 1fr; } }
+    .lm-tile { background: var(--sur); border: 1px solid var(--bdr); border-radius: 6px; padding: 12px 14px; }
+    .lm-tile-title { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); margin-bottom: 6px; }
+    .lm-tile p { margin: 0; }
+    .lm-tile .status-badge { margin-right: 4px; }
+    .lm-stat { font-size: 22px; font-weight: 600; color: var(--txt); line-height: 1.2; }
+    .lm-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 8px 0 12px; counter-reset: lmstep; }
+    @media (max-width: 640px) { .lm-steps { grid-template-columns: 1fr; } }
+    .lm-step {
+      position: relative; background: var(--sur); border: 1px solid var(--bdr); border-radius: 6px;
+      padding: 10px 12px 10px 38px; counter-increment: lmstep;
+    }
+    .lm-step::before {
+      content: counter(lmstep); position: absolute; left: 10px; top: 10px;
+      width: 18px; height: 18px; border-radius: 50%; background: var(--blu); color: var(--bg);
+      font-size: 11px; font-weight: 600; line-height: 18px; text-align: center;
+    }
+    .lm-step b { display: block; font-size: 13px; }
+    .lm-step span { font-size: 12px; color: var(--mut); }
+    .lm-note { color: var(--mut); font-size: 12px; }
+    table.lm-tbl { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+    table.lm-tbl th {
+      background: var(--sur); color: var(--mut); font-size: 11px; font-weight: 600; letter-spacing: .03em;
+      text-transform: uppercase; text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--bdr);
+    }
+    table.lm-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--sur2); vertical-align: middle; }
+    table.lm-tbl tbody tr:last-child td { border-bottom: none; }
+    .lm-foot {
+      padding: 12px 24px; border-top: 1px solid var(--bdr); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--mut);
+    }
+    .lm-foot .lm-close-btn {
+      border: 1px solid var(--blu); background: var(--blu); color: var(--bg); font: inherit; font-size: 13px;
+      padding: 6px 20px; border-radius: 4px; cursor: pointer;
+    }
+    .lm-foot .lm-close-btn:hover { background: var(--blu-40); border-color: var(--blu-40); }
   </style>
 </head>
 <body>
@@ -437,52 +605,73 @@
 
     <!-- Filter bar — shown on Program Overview only -->
     <div id="snap-bar">
-      <div class="po-fc">
-        <label>YEAR/MONTH</label>
-        <select id="po-f-yearmonth"><option value="">All</option></select>
+      <div class="po-fgrp">
+        <div class="po-fc">
+          <label>ORG TYPE</label>
+          <select id="po-f-type">
+            <option value="">All</option>
+            <option value="MSP">MSP</option>
+            <option value="CCB">CCB</option>
+          </select>
+        </div>
+        <div class="po-fc">
+          <label>REGION</label>
+          <select id="po-f-iot"><option value="">All</option></select>
+        </div>
+        <div class="po-fc">
+          <label>CONTRACT TYPE</label>
+          <select id="po-f-ctype">
+            <option value="">All</option>
+            <option value="Annual">Annual</option>
+            <option value="Monthly">Monthly</option>
+          </select>
+        </div>
+        <div class="po-fc">
+          <label>VENDOR</label>
+          <select id="po-f-vendor"><option value="">All</option></select>
+        </div>
+        <div class="po-fc">
+          <label>NAME</label>
+          <div class="iov-combo po-combo" id="po-name-combo">
+            <input id="po-f-name" class="iov-combo-input" type="text" value="All"
+                   placeholder="All" autocomplete="off" spellcheck="false" />
+            <span class="iov-combo-arrow">▼</span>
+            <div class="iov-combo-list" id="po-f-name-list"></div>
+          </div>
+        </div>
       </div>
-      <div class="po-fc">
-        <label>NAME</label>
-        <select id="po-f-name"><option value="">All</option></select>
+      <div class="po-fgrp po-fgrp-table">
+        <span class="po-fgrp-cap">Table only</span>
+        <div class="po-fc">
+          <label>REPORTING MONTH</label>
+          <select id="po-f-yearmonth"></select>
+        </div>
+        <div class="po-fc">
+          <label>CONTRACTS</label>
+          <select id="po-f-contract">
+            <option value="">All</option>
+            <option value="Active" selected>Active</option>
+            <option value="Expired">Expired</option>
+          </select>
+        </div>
+        <div class="po-fc">
+          <label>STATUS</label>
+          <select id="po-f-status">
+            <option value="">All</option>
+            <option value="Early Stage">Early Stage</option>
+            <option value="Healthy">Healthy</option>
+            <option value="Moderate">Moderate</option>
+            <option value="At Risk">At Risk</option>
+            <option value="Over Utilization">Over Utilization</option>
+            <option value="Low Utilization">Low Utilization</option>
+            <option value="No CSUM">No CSUM</option>
+          </select>
+        </div>
       </div>
-      <div class="po-fc">
-        <label>VENDOR</label>
-        <select id="po-f-vendor"><option value="">All</option></select>
+      <div class="po-fnote">
+        <span class="po-l12-icon" aria-hidden="true">i</span>
+        <span>Org Type, Region, Contract Type, Vendor and Name filter the KPIs, charts and table. Reporting Month, Contracts and Status filter the table only.</span>
       </div>
-      <div class="po-fc">
-        <label>TYPE</label>
-        <select id="po-f-type">
-          <option value="">All</option>
-          <option value="MSP">MSP</option>
-          <option value="CCB">CCB</option>
-        </select>
-      </div>
-      <div class="po-fc">
-        <label>REGION</label>
-        <select id="po-f-iot"><option value="">All</option></select>
-      </div>
-      <div class="po-fc">
-        <label>CONTRACT TYPE</label>
-        <select id="po-f-ctype">
-          <option value="">All</option>
-          <option value="Annual">Annual</option>
-          <option value="Monthly">Monthly</option>
-        </select>
-      </div>
-      <div class="po-fc">
-        <label>STATUS</label>
-        <select id="po-f-status">
-          <option value="">All</option>
-          <option value="Early Stage">Early Stage</option>
-          <option value="Healthy">Healthy</option>
-          <option value="Moderate">Moderate</option>
-          <option value="At Risk">At Risk</option>
-          <option value="Over Utilization">Over Utilization</option>
-          <option value="Low Utilization">Low Utilization</option>
-          <option value="Expired">Expired</option>
-        </select>
-      </div>
-      <div class="filter-scope-note">* Filters apply to KPIs, charts and the Management Overview table</div>
     </div>
 
     <!-- ����������������������������������������������������������������������
@@ -495,6 +684,10 @@
 
       <!-- Management Org Details table -->
       <div class="iov-section-title" style="margin-top:8px">Management Org Details</div>
+      <div class="po-l12-note" id="po-past-month-note" style="display:none;margin-top:0">
+        <span class="po-l12-icon" aria-hidden="true">i</span>
+        <span id="po-past-month-note-text"></span>
+      </div>
       <div class="mgmt-table-wrap" id="po-mgmt-wrap">
         <table class="mgmt-table" id="po-mgmt-tbl">
           <thead id="po-mgmt-thead"></thead>
@@ -502,10 +695,20 @@
         </table>
       </div>
 
+      <!-- Note: all Program Overview charts show the last 12 months (current month to date is the 12th) -->
+      <div class="po-l12-note" id="po-l12-note">
+        <span class="po-l12-icon" aria-hidden="true">i</span>
+        <span id="po-l12-note-text">All charts below show the last 12 months, including the current month to date.</span>
+      </div>
+
       <!-- Full-width Monthly CSUM chart -->
       <div class="chart-box" style="margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <h3 style="margin-bottom:0">Monthly CSUM Trending</h3>
+          <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#42be65"></span>Total Configured CSUM</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ff832b"></span>Monthly Commit</span>
+          </div>
         </div>
         <canvas id="chart-csum-monthly" style="max-height:300px"></canvas>
       </div>
@@ -516,16 +719,35 @@
           <h3 id="csum-trend-title" style="margin-bottom:0">Annual CSUM Trending</h3>
           <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
             <span id="csum-trend-commit-label" style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#ff832b;border-radius:2px"></span>Annual Commit</span>
-            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#4589ff;border-radius:2px"></span>Total Configured CSUM</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#42be65;border-radius:2px"></span>Total Configured CSUM</span>
           </div>
         </div>
         <canvas id="chart-csum-trend" style="max-height:220px"></canvas>
       </div>
 
+      <!-- Total End Consumers — monthly active count, total / MSP / CCB — full width line chart -->
+      <div class="chart-box" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin-bottom:0">Total End Consumers</h3>
+          <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#a56eff;border-radius:2px"></span>Total</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#4589ff;border-radius:2px"></span>MSP</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:24px;height:3px;background:#f1c21b;border-radius:2px"></span>CCB</span>
+          </div>
+        </div>
+        <canvas id="chart-ec-count" style="max-height:220px"></canvas>
+      </div>
+
       <!-- Configured CSUM — MSP vs CCB by Month — full width -->
       <!-- MSP vs CCB — full width -->
       <div class="chart-box" style="margin-bottom:20px">
-        <h3>Configured CSUM — MSP vs CCB by Month</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin-bottom:0">Configured CSUM — MSP vs CCB by Month</h3>
+          <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(69,137,255,0.85)"></span>MSP</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(241,194,27,0.85)"></span>CCB</span>
+          </div>
+        </div>
         <canvas id="chart-type-month" style="max-height:260px"></canvas>
       </div>
 
@@ -590,13 +812,22 @@
         </table>
       </div>
 
+      <!-- DXC Region Selector (Visible only for DXC Technology Services - FinOps) -->
+      <div id="iov-dxc-region-bar" style="display:none;margin-bottom:16px;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:600;color:var(--mut);margin-right:4px">REGION VIEW:</span>
+        <button type="button" class="iov-dxc-btn active" data-region="ALL">DXC Global</button>
+        <button type="button" class="iov-dxc-btn" data-region="US">DXC US</button>
+        <button type="button" class="iov-dxc-btn" data-region="EU">DXC EU</button>
+        <button type="button" class="iov-dxc-btn" data-region="AU">DXC AU</button>
+      </div>
+
       <!-- 1. CSUM Trending (Assigned vs Unassigned) — Full width -->
       <div class="chart-box" style="margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <h3 style="margin-bottom:0">CSUM Trending (Assigned vs Unassigned)</h3>
           <div style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut)">
-            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:12px;height:12px;background:#42be65;border-radius:2px"></span>assigned to end consumer</span>
-            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:12px;height:12px;background:#b4b4b4;border-radius:2px"></span>not assigned to end consumer</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;background:#42be65;border-radius:2px"></span>assigned to end consumer</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;background:#b4b4b4;border-radius:2px"></span>not assigned to end consumer</span>
           </div>
         </div>
         <canvas id="iov-csum-chart" style="max-height:320px"></canvas>
@@ -636,7 +867,10 @@
 
         <!-- CSUM Trending by Vendor -->
         <div class="chart-box">
-          <h3>CSUM Trending by Vendor</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <h3 style="margin-bottom:0">CSUM Trending by Vendor</h3>
+            <div id="iov-vendor-legend" style="display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mut);flex-wrap:wrap"></div>
+          </div>
           <canvas id="iov-chart-csum-vendor" style="max-height:280px"></canvas>
         </div>
       </div>
@@ -686,6 +920,95 @@
 
   </div><!-- /dashboard -->
 </main>
+
+<!-- Status & Utilization % logic pop-up — opened from the (i) icons in the table headers -->
+<div id="lm-overlay">
+  <div id="lm-dialog" role="dialog" aria-modal="true" aria-labelledby="lm-title">
+    <div class="lm-head">
+      <h2 id="lm-title">How Utilization % and Status are calculated</h2>
+      <button type="button" class="lm-close" id="lm-close" aria-label="Close">&times;</button>
+    </div>
+
+    <div id="lm-body">
+      <div class="lm-tiles">
+        <div class="lm-tile">
+          <div class="lm-tile-title">Utilization %</div>
+          <p><b>Utilization %</b> = cloud spend (CSUM) &divide; Commit Amount.</p>
+        </div>
+        <div class="lm-tile">
+          <div class="lm-tile-title">Status</div>
+          <p><b>Status</b> for Annual contracts is based on <b>pace</b> (spend compared with how far into the contract you are), so contracts with different percentages can share a status. Monthly contracts use fixed bands.</p>
+        </div>
+        <div class="lm-tile">
+          <div class="lm-tile-title">Special statuses</div>
+          <p><span class="status-badge status-expired">Expired</span> = the contract has ended.</p>
+          <p><span class="status-badge status-no-csum">No CSUM</span> = no cloud spend recorded yet.</p>
+        </div>
+      </div>
+
+      <h3>Utilization %</h3>
+      <table class="lm-tbl">
+        <thead><tr><th>Contract</th><th>Utilization %</th><th>Period covered</th></tr></thead>
+        <tbody>
+          <tr><td>Annual</td><td>CSUM (Lifetime) &divide; Commit Amount</td><td>Contract start to the selected month</td></tr>
+          <tr><td>Monthly</td><td>CSUM (Lifetime) &divide; (Monthly Commit &times; Tenure months)</td><td>Contract start to the selected month</td></tr>
+        </tbody>
+      </table>
+      <p class="lm-note">The same formulas apply to expired contracts. Status is always <b>Expired</b> for ended contracts regardless of the percentage.</p>
+
+      <h3>Status</h3>
+      <h4>Annual contracts: judged on pace</h4>
+      <div class="lm-steps">
+        <div class="lm-step"><b>Months elapsed</b><span>Months since contract start (max 12; first month counts as 1)</span></div>
+        <div class="lm-step"><b>Expected %</b><span>Months elapsed &divide; 12 &times; 100</span></div>
+        <div class="lm-step"><b>Pacing ratio</b><span>Utilization % &divide; Expected %</span></div>
+      </div>
+      <table class="lm-tbl">
+        <thead><tr><th>Pacing ratio</th><th>Status</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Above 1.15</td><td><span class="status-badge status-over-util">Over Utilization</span></td><td>Well ahead of pace</td></tr>
+          <tr><td>0.85 to 1.15</td><td><span class="status-badge status-healthy">Healthy</span></td><td>On pace</td></tr>
+          <tr><td>0.60 to 0.85</td><td><span class="status-badge status-moderate">Moderate</span></td><td>Somewhat behind</td></tr>
+          <tr><td>0.35 to 0.60</td><td><span class="status-badge status-low-util">Low Utilization</span></td><td>Well behind</td></tr>
+          <tr><td>Below 0.35</td><td><span class="status-badge status-at-risk">At Risk</span></td><td>Far behind pace</td></tr>
+          <tr><td>Below 0.85 in months <span style="white-space:nowrap">1&ndash;2</span></td><td><span class="status-badge status-early-stage">Early Stage</span></td><td>New contract, still ramping up (shown instead of Moderate, Low Utilization or At Risk)</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Monthly contracts: fixed bands</h4>
+      <p>Based on the Utilization % of the selected month.</p>
+      <table class="lm-tbl">
+        <thead><tr><th>Utilization %</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Above 100%</td><td><span class="status-badge status-over-util">Over Utilization</span></td></tr>
+          <tr><td>70% to 100%</td><td><span class="status-badge status-healthy">Healthy</span></td></tr>
+          <tr><td>50% to 70%</td><td><span class="status-badge status-moderate">Moderate</span></td></tr>
+          <tr><td>30% to 50%</td><td><span class="status-badge status-low-util">Low Utilization</span></td></tr>
+          <tr><td>Below 30% (including 0%)</td><td><span class="status-badge status-at-risk">At Risk</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Commit Amount</h3>
+      <p>Number of Monitored Costs entitlements &times; the value of each entitlement:</p>
+      <div class="lm-tiles lm-tiles-2">
+        <div class="lm-tile"><div class="lm-tile-title">Monthly contracts</div><div class="lm-stat">$1,000</div><p class="lm-note">per entitlement</p></div>
+        <div class="lm-tile"><div class="lm-tile-title">Annual contracts</div><div class="lm-stat">$100,000</div><p class="lm-note">per entitlement</p></div>
+      </div>
+
+      <h3>Good to know</h3>
+      <ul>
+        <li>The table always shows the current month (month to date). Months elapsed are counted up to the <b>Data refreshed</b> date.</li>
+        <li>Monthly contracts show lifetime utilization (all spend to date &divide; monthly commit &times; tenure). A month with no new spend lowers the percentage but does not reset it to 0%.</li>
+        <li>Annual statuses can change between weekly updates as the contract gets older.</li>
+      </ul>
+    </div>
+
+    <div class="lm-foot">
+      <span><button type="button" class="lm-link" id="lm-glossary-link">Full definitions in the Glossary &rarr;</button></span>
+      <button type="button" class="lm-close-btn" id="lm-close2">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- PDF generation overlay — shown while building the PDF -->
 <div id="iov-pdf-overlay">
@@ -787,7 +1110,7 @@
 
   function renderBoth() {
     const rowsA = snapRecords();
-    renderKPIs(rowsA, rowsA);
+    renderKPIs(rowsA);
     renderMgmtTable(rowsA);
     renderCharts(rowsA);
   }
@@ -818,7 +1141,9 @@
           iot:            r.iot || '',
           region:         r.region || '',
           market:         r.imt || '',
-          owner:          r.owner || r.ibmClientName || null,
+          tam:            r.tam || null,
+          psm:            r.psm || null,
+          sentiment:      '',
           contractStart:  r.contractStart,
           contractEnd:    r.contractEnd,
           tenureMonths:   r.tenureMonths,
@@ -839,8 +1164,10 @@
       }
       const o = orgMap[key];
       if (r.yearMonth) o.yearMonths.add(r.yearMonth);
+      // Sentiment is a per-org attribute (same on every row of an org), so take it from any row, not only the target month.
+      if (r.sentiment) o.sentiment = r.sentiment;
 
-      const isTarget = targetYM ? (r.yearMonth === targetYM) : Boolean(r.isLatestMonth);
+      const isTarget = targetYM ? (r.yearMonth === targetYM) : Boolean(r.isCurrentMonth);
       if (isTarget) {
         o.targetMatched = true;
         o.reportingMonth = r.yearMonth;
@@ -848,7 +1175,9 @@
         o.contractEnd   = r.contractEnd || o.contractEnd;
         o.tenureMonths  = r.tenureMonths !== undefined ? r.tenureMonths : o.tenureMonths;
         o.contractType  = r.contractType || o.contractType;
-        o.owner         = r.owner || r.ibmClientName || o.owner;
+        o.contractStatus= r.contractStatus || o.contractStatus;
+        o.tam           = r.tam || o.tam;
+        o.psm           = r.psm || o.psm;
         o.vendor        = r.vendor || o.vendor;
         o.iot           = r.iot || o.iot;
         o.region        = r.region || o.region;
@@ -876,7 +1205,9 @@
         o.latestContractEnd   = r.contractEnd;
         o.latestTenureMonths  = r.tenureMonths;
         o.latestContractType  = r.contractType;
-        o.latestOwner         = r.owner || r.ibmClientName || o.owner;
+        o.latestContractStatus= r.contractStatus || o.latestContractStatus;
+        o.latestTam           = r.tam || o.latestTam;
+        o.latestPsm           = r.psm || o.latestPsm;
         o.latestVendor        = r.vendor || o.vendor;
         o.latestIot           = r.iot || o.iot;
         o.latestRegion        = r.region || o.region;
@@ -908,21 +1239,32 @@
       const endConsumerCount = o.targetMatched ? o.targetEndConsumers.size : o.endConsumers.size;
       const reportingMonth = o.targetMatched ? o.reportingMonth : (targetYM || o.latestYM);
       // % Utilization:
-      //   Monthly: csumCurrent  / committedAmount
+      //   Monthly: csumLifetime / (committedAmount × tenureMonths)  — whole-life view
       //   Annual:  csumLifetime / committedAmount
+      //   Expired (contractEnd < snapshot date) — same formulas apply; status becomes Expired.
+      //   Status stays 'Expired' and the bar stays grey (both follow status, not %).
       // Status:
       //   Monthly: flat bands on utilization %.
       //   Annual:  pacing-adjusted — pacingRatio = actualPct / expectedPct, where
       //            expectedPct = min(tenureMonths,12)/12 × 100 (linear burn).
       const contractType = o.targetMatched ? o.contractType : o.latestContractType;
+      const contractStatus = o.targetMatched ? o.contractStatus : o.latestContractStatus;
       const tenure  = o.targetMatched ? o.tenureMonths : o.latestTenureMonths;
       const contractEnd = o.targetMatched ? o.contractEnd : o.latestContractEnd;
       const elapsed = Math.min(tenure || 1, 12);
       const snapDate = D.weeklySnapshots?.[0]?.snapshotDate || '';
-      const isExpired = Boolean(contractEnd && snapDate && contractEnd < snapDate);
+      const isExpired = contractStatus ? (contractStatus === 'EXPIRED') : Boolean(contractEnd && snapDate && contractEnd < snapDate);
       let utilPct = null;
       if (o.committedAmount > 0) {
-        utilPct = ((contractType === 'Monthly' ? o.csumCurrent : o.csumLifetime) / o.committedAmount) * 100;
+        if (contractType === 'Monthly') {
+          // Lifetime view for Monthly: CSUM (Lifetime) / (Monthly Commit × Tenure months).
+          // Same formula for both live and expired contracts.
+          const commitBase = o.committedAmount * (tenure || 0);
+          if (commitBase > 0) utilPct = (o.csumLifetime / commitBase) * 100;
+        } else {
+          // Annual (live or expired): CSUM (Lifetime) / Commit Amount.
+          utilPct = (o.csumLifetime / o.committedAmount) * 100;
+        }
       }
       const csumTotal = o.csumLifetime;
       let status;
@@ -946,8 +1288,7 @@
         else if (utilPct >= 70)          status = 'Healthy';
         else if (utilPct >= 50)          status = 'Moderate';
         else if (utilPct >= 30)          status = 'Low Utilization';
-        else if (utilPct > 0)            status = 'At Risk';
-        else                             status = 'Expired';
+        else                             status = 'At Risk';   // 0% on a live contract = no usage this month; real expiry is handled by isExpired above
       }
 
       return {
@@ -963,8 +1304,12 @@
         contractEnd:     o.targetMatched ? o.contractEnd : o.latestContractEnd,
         tenureMonths:    o.targetMatched ? o.tenureMonths : o.latestTenureMonths,
         contractType:    o.targetMatched ? o.contractType : o.latestContractType,
-        owner:           o.targetMatched ? o.owner : o.latestOwner,
+        contractStatus:  o.targetMatched ? o.contractStatus : o.latestContractStatus,
+        tam:             o.targetMatched ? o.tam : o.latestTam,
+        psm:             o.targetMatched ? o.psm : o.latestPsm,
+        sentiment:       o.sentiment,
         status,
+        isExpired,
         endConsumerCount,
         csumCurrent:     o.csumCurrent,
         csumLifetime:    o.csumLifetime,
@@ -974,26 +1319,46 @@
     });
   }
 
-  function renderKPIs(rowsA, rowsB) {
-    // rowsA — fully filtered rows (all active filters applied): drives count KPIs.
-    // rowsB — filtered by everything except yearMonth: drives Total CSUM KPIs so
-    //         "Last Month" and "Last 12 Months" are never cut off by the YM selector.
-    const csumRows = rowsB || rowsA;
+  function renderKPIs(rowsA) {
+    // rowsA — rows with all filters applied (kept for the caller's signature). The org-count KPIs
+    // below rebuild their own row set from the full snapshot, ignoring the reporting month (see activeContractRows).
+    // csumRows — always recomputed from the full snapshot with the scope filters (name, vendor, org type, region,
+    // contract type) but no month filter. "Total CSUM Last Month" and "Total CSUM Last 12 Months" are
+    // inherently time-bounded by the
+    // isLatestMonth / isCurrentMonth / isL12Months flags baked into each record at build time.
+    const allSnapRows = (D.weeklySnapshots[0]?.records) || [];
+    const f = poTableFilter;
+    const csumRows = allSnapRows.filter(r => {
+      if (f.name   && (r.name || r.managementOrgName) !== f.name) return false;
+      if (f.vendor && r.vendor       !== f.vendor)    return false;
+      if (f.type   && r.type         !== f.type)      return false;
+      if (f.iot    && r.iot          !== f.iot)       return false;
+      if (f.ctype  && r.contractType !== f.ctype)     return false;
+      return true;
+    });
 
     const snap = D.weeklySnapshots && D.weeklySnapshots[0];
     const snapDate = snap?.snapshotDate || '';
 
-    // Active contracts filter (CONTRACT_START_DATE <= snapDate AND CONTRACT_END_DATE >= snapDate)
-    const activeContractRows = rowsA.filter(r => {
+    // Active contracts filter (CONTRACT_START_DATE <= snapDate AND CONTRACT_END_DATE >= snapDate).
+    // An org is active if ANY of its rows (any month) sits in a live contract, so the Year/Month
+    // filter is ignored here — an org with a live contract but no row yet for the latest month
+    // (e.g. billing not landed) must still be counted. All other filters still apply.
+    const isActiveRow = r => {
+      if (r.contractStatus) return r.contractStatus === 'ACTIVE';
       if (!snapDate || !r.contractStart || !r.contractEnd) return true;
       return r.contractStart <= snapDate && r.contractEnd >= snapDate;
-    });
+    };
+    const activeContractRows = applyPoRowFilter(allSnapRows, true).filter(isActiveRow);
 
     // Deduplicate active orgs by customer identifier (CUSTOMER_NAME_FULL_MRGD / MANAGEMENT_ORG_NAME / NAME)
-    const activeOrgNames    = new Set(activeContractRows.map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
-    const activeMSPNames    = new Set(activeContractRows.filter(o => o.type === 'MSP').map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
-    const activeCCBNames    = new Set(activeContractRows.filter(o => o.type === 'CCB').map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
-    const activeWithECNames = new Set(activeContractRows.filter(o => o.endConsumerName).map(o => o.customerNameFull || o.managementOrgName || o.name).filter(Boolean));
+    const orgKey            = o => o.customerNameFull || o.managementOrgName || o.name;
+    const activeOrgNames    = new Set(activeContractRows.map(orgKey).filter(Boolean));
+    const activeMSPNames    = new Set(activeContractRows.filter(o => o.type === 'MSP').map(orgKey).filter(Boolean));
+    const activeCCBNames    = new Set(activeContractRows.filter(o => o.type === 'CCB').map(orgKey).filter(Boolean));
+    // "Active end consumers" = end consumers in the latest month (same basis as Total End Consumers),
+    // not any month of the contract, so the % is not inflated by past usage.
+    const activeWithECNames = new Set(activeContractRows.filter(o => o.endConsumerName && o.isLatestMonth).map(orgKey).filter(Boolean));
 
     // Active Management Orgs
     const activeMgmtOrgs = activeOrgNames.size;
@@ -1005,14 +1370,30 @@
     const withECpct = activeMgmtOrgs > 0
       ? Math.round(withEC / activeMgmtOrgs * 100) + '%'
       : '—';
-    // Total End Consumers — unique names where isLatestMonth = true (uses csumRows — no YM filter)
-    const allEC = new Set();
-    csumRows.filter(r => r.isLatestMonth === true).forEach(r => { if (r.endConsumerName) allEC.add(r.endConsumerName); });
-    const totalEC = allEC.size;
+    // Total End Consumers — unique names on ACTIVE contracts where isLatestMonth = true
+    // (uses csumRows — no YM filter). Expired contracts are excluded; split by Org Type.
+    const ecByType = { ALL: new Set(), MSP: new Set(), CCB: new Set() };
+    csumRows.filter(r => r.isLatestMonth === true && isActiveRow(r)).forEach(r => {
+      if (!r.endConsumerName) return;
+      ecByType.ALL.add(r.endConsumerName);
+      if (ecByType[r.type]) ecByType[r.type].add(r.endConsumerName);
+    });
+    const totalEC = ecByType.ALL.size;
+    const latestYM = (allSnapRows.find(r => r.isLatestMonth) || {}).yearMonth;
+    const lastMonthTip = latestYM ? 'Last completed month: ' + fmtYMLabel(latestYM) : '';
+    const activeTip = 'Orgs with an active contract as of the ' + (snapDate || 'latest') + ' snapshot.';
+    const ecSub = 'MSP ' + ecByType.MSP.size.toLocaleString() + ' · CCB ' + ecByType.CCB.size.toLocaleString();
     // CSUM: last month — uses csumRows so yearMonth filter does not suppress it
-    const csumLastMonth = csumRows.filter(r => r.isLatestMonth).reduce((s,r) => s + (r.configuredCSum||0), 0);
-    // CSUM: last 12 months — uses csumRows so yearMonth filter does not suppress it
-    const csumL12 = csumRows.filter(r => r.isL12Months).reduce((s,r) => s + (r.configuredCSum||0), 0);
+    // All three CSUM KPIs use the same de-duplicated usage lines as the Program Overview charts
+    // (dedupeCsumLines), so a renewal-month line that sits under two contracts is counted once and the
+    // Last 12 Months card equals the sum of the chart bars.
+    const csumL12Rows = dedupeCsumLines(csumRows.filter(r => r.isL12Months));
+    const csumTotal = fn => csumL12Rows.filter(fn).reduce((s,r) => s + (r.configuredCSum||0), 0);
+    const csumLastMonth    = csumTotal(r => r.isLatestMonth);
+    // CSUM: current month (month to date) — same basis as the other CSUM KPIs
+    const csumCurrentMonth = csumTotal(r => r.isCurrentMonth);
+    // CSUM: last 12 months (the 12th month is the current month to date) — uses csumRows so yearMonth filter does not suppress it
+    const csumL12          = csumTotal(() => true);
 
     function fmtC(v) {
       if (!v) return '$0';
@@ -1023,19 +1404,22 @@
     }
 
     const cards = [
-      { label: 'Active\nManagement Orgs',       value: activeMgmtOrgs.toString() },
-      { label: 'Active\nMSP Orgs',               value: activeMSP.toString() },
-      { label: 'Active\nCCB Orgs',               value: activeCCB.toString() },
-      { label: 'Management Orgs with\nActive End Consumers (%)', value: withECpct },
-      { label: 'Total End Consumers\n(Active Orgs)', value: totalEC.toLocaleString() },
+      { label: 'Active\nManagement Orgs',       value: activeMgmtOrgs.toString(), tip: activeTip, narrow: true },
+      { label: 'Active\nMSP Orgs',               value: activeMSP.toString(),      tip: activeTip, narrow: true },
+      { label: 'Active\nCCB Orgs',               value: activeCCB.toString(),      tip: activeTip, narrow: true },
+      { label: 'Management Orgs with\nActive End Consumers (%)', value: withECpct, tip: lastMonthTip, wide: true },
+      { label: 'Total End Consumers\n(Active Contracts)', value: totalEC.toLocaleString(), sub: ecSub, tip: lastMonthTip },
       { label: 'Total CSUM\n(Last Month)',        value: fmtC(csumLastMonth), accent: true },
+      { label: 'Total CSUM\n(Current Month, MTD)', value: fmtC(csumCurrentMonth), accent: true },
       { label: 'Total CSUM\n(Last 12 Months)',    value: fmtC(csumL12),       accent: true },
     ];
 
     document.getElementById('kpi-row').innerHTML = cards.map(c => `
-      <div class="kpi-card${c.accent ? ' accent' : ''}">
+      <div class="kpi-card${c.accent ? ' accent' : ''}${c.tip ? ' has-tip' : ''}${c.narrow ? ' narrow' : ''}${c.wide ? ' wide' : ''}">${c.tip ? `
+        <span class="kpi-tip"><button type="button" class="kpi-tip-btn" aria-label="${c.tip}">i</button><span class="kpi-tip-text" role="tooltip">${c.tip}</span></span>` : ''}
         <div class="kpi-label">${c.label.replace(/\n/g,'<br>')}</div>
-        <div class="kpi-value">${c.value}</div>
+        <div class="kpi-value">${c.value}</div>${c.sub ? `
+        <div class="kpi-delta neu">${c.sub}</div>` : ''}
       </div>`).join('');
   }
 
@@ -1045,13 +1429,15 @@
 
   const MGMT_COLS = [
     { key:'name',            label:'Name' },
-    { key:'type',            label:'MSP or CCB' },
+    { key:'type',            label:'Org Type' },
     { key:'reportingMonth',  label:'Reporting\nMonth' },
     { key:'contractStart',   label:'Contract\nStart Date' },
     { key:'contractEnd',     label:'Contract\nEnd Date' },
     { key:'tenureMonths',    label:'Tenure\n(Months)',      num:true },
     { key:'contractType',    label:'Contract\nType' },
-    { key:'owner',           label:'Owner' },
+    { key:'tam',             label:'TAM' },
+    { key:'psm',             label:'PSM' },
+    { key:'sentiment',       label:'Sentiment' },
     { key:'status',          label:'Status' },
     { key:'endConsumerCount',label:'End\nConsumers',        num:true },
     { key:'csumCurrent',     label:'CSUM (Current\nMonth)', num:true, money:true },
@@ -1060,9 +1446,65 @@
     { key:'committedAmount', label:'Commit\nAmount',        num:true, money:true },
   ];
 
+  // ── Status & Utilization % logic pop-up ───────────────────────────────────
+  // (i) icon on these header columns opens the pop-up. The rule text lives in the #lm-overlay
+  // markup and mirrors STATUS-UTILIZATION-LOGIC.md; update both when buildMgmtOrgs() changes
+  // (thresholds shown in the pop-up tables must match the ones in buildMgmtOrgs()).
+  const LM_INFO_COLS = { status: 'How Status is calculated', utilPct: 'How Utilization % is calculated', committedAmount: 'How Commit Amount is calculated' };
+  let lmLastFocus = null;
+
+  function lmInfoButton(col) {
+    const label = LM_INFO_COLS[col.key];
+    if (!label) return null;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lm-info-btn';
+    b.textContent = 'i';
+    b.setAttribute('aria-label', label);
+    b.setAttribute('aria-haspopup', 'dialog');
+    b.addEventListener('click', e => { e.stopPropagation(); lmOpen(b); });   // stopPropagation: don't sort the column
+    return b;
+  }
+
+  function lmOpen(trigger) {
+    lmLastFocus = trigger || document.activeElement;
+    document.getElementById('lm-overlay').classList.add('visible');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('lm-body').scrollTop = 0;
+    document.getElementById('lm-close').focus();
+  }
+
+  function lmClose() {
+    document.getElementById('lm-overlay').classList.remove('visible');
+    document.body.style.overflow = '';
+    if (lmLastFocus && document.body.contains(lmLastFocus)) lmLastFocus.focus();
+  }
+
+  (function wireLogicModal() {
+    const ov = document.getElementById('lm-overlay');
+    ov.addEventListener('click', e => { if (e.target === ov) lmClose(); });
+    document.getElementById('lm-close').addEventListener('click', lmClose);
+    document.getElementById('lm-close2').addEventListener('click', lmClose);
+    document.getElementById('lm-glossary-link').addEventListener('click', () => { lmClose(); switchTopTab('glossary'); });
+    document.addEventListener('keydown', e => {
+      if (!ov.classList.contains('visible')) return;
+      if (e.key === 'Escape') { e.preventDefault(); lmClose(); return; }
+      if (e.key !== 'Tab') return;
+      // Keep keyboard focus inside the dialog
+      const items = [...ov.querySelectorAll('button')].filter(el => el.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (!ov.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    });
+  })();
+
   // ── Table filter state ────────────────────────────────────────────────────
-  const poTableFilter = { yearMonth: '', name: '', vendor: '', type: '', iot: '', ctype: '', status: '' };
+  // yearMonth defaults to the current (month-to-date) month; the "Reporting Month" dropdown (table only) can switch it to any of the last 12 months.
+  const poTableFilter = { yearMonth: (D.weeklySnapshots[0]?.records.find(r => r.isCurrentMonth)?.yearMonth) || '', name: '', vendor: '', type: '', iot: '', ctype: '', status: '', contract: 'Active' };
   let poFilteredOrgs = [];  // last rendered list (for filter info)
+  let poNameOptions = [];
 
   let poMgmtSort = { col: 'csumCurrent', dir: -1 };
 
@@ -1108,6 +1550,12 @@
     const v = org[col.key];
     if (col.util)  return utilBar(v, org.status);
     if (col.key === 'status') return statusBadge(v);
+    if (col.key === 'sentiment') return v || '';   // blank when the org has no tracked sentiment (no "—")
+    if (col.key === 'tam' || col.key === 'psm' || col.key === 'name') {  // TAM/PSM blank (no "—"); cell scrolls sideways for long names
+      if (!v) return col.key === 'name' ? '—' : '';
+      const s = String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      return `<div class="cell-scroll${col.key === 'name' ? ' name-scroll' : ''}" title="${s}">${s}</div>`;
+    }
     if (col.money) return v != null ? fmtV(v) : '—';
     if (col.num)   return v != null ? Number(v).toLocaleString() : '—';
     return v != null && v !== '' ? String(v) : '—';
@@ -1116,41 +1564,34 @@
   function applyPoTableFilter(orgs) {
     const f = poTableFilter;
     return orgs.filter(o => {
-      if (f.yearMonth && !o.yearMonths.includes(f.yearMonth)) return false;
+      // An org with no row yet in the reporting month stays if its contract is live (same basis as the Active Orgs KPI).
+      if (f.yearMonth && !o.yearMonths.includes(f.yearMonth) && o.isExpired) return false;
       if (f.name      && o.name         !== f.name)           return false;
       if (f.vendor    && o.vendor       !== f.vendor)         return false;
       if (f.type      && o.type         !== f.type)           return false;
       if (f.iot       && o.iot          !== f.iot)            return false;
       if (f.ctype     && o.contractType !== f.ctype)          return false;
       if (f.status    && o.status       !== f.status)         return false;
+      // Contracts: Active = contractEnd >= snapshot date, Expired = contractEnd < snapshot date
+      // (same rule as isExpired in buildMgmtOrgs). Table only — deliberately NOT in applyPoRowFilter,
+      // which also feeds the KPI org counts and the charts.
+      if (f.contract === 'Active'  &&  o.isExpired) return false;
+      if (f.contract === 'Expired' && !o.isExpired) return false;
       return true;
     });
   }
 
-  // Row-level filter — mirrors poTableFilter on raw records (for KPIs & charts)
-  function applyPoRowFilter(rows) {
+  // Row-level filter — mirrors poTableFilter on raw records (for KPIs & charts).
+  // ignoreYM: skip the Year/Month filter (the charts are L12 trends, so they must not collapse to one month).
+  function applyPoRowFilter(rows, ignoreYM) {
     const f = poTableFilter;
     return rows.filter(r => {
-      if (f.yearMonth && r.yearMonth    !== f.yearMonth) return false;
+      if (!ignoreYM && f.yearMonth && r.yearMonth !== f.yearMonth) return false;
       if (f.name      && (r.name || r.managementOrgName) !== f.name) return false;
       if (f.vendor    && r.vendor       !== f.vendor)    return false;
       if (f.type      && r.type         !== f.type)      return false;
       if (f.iot       && r.iot          !== f.iot)       return false;
       if (f.ctype     && r.contractType !== f.ctype)     return false;
-      return true;
-    });
-  }
-
-  // Same filter but WITHOUT the yearMonth restriction — used for Total CSUM KPIs
-  // so they always reflect all months (Last Month / Last 12 Months are inherently time-bounded).
-  function applyPoRowFilterNoYM(rows) {
-    const f = poTableFilter;
-    return rows.filter(r => {
-      if (f.name   && (r.name || r.managementOrgName) !== f.name) return false;
-      if (f.vendor && r.vendor       !== f.vendor)    return false;
-      if (f.type   && r.type         !== f.type)      return false;
-      if (f.iot    && r.iot          !== f.iot)       return false;
-      if (f.ctype  && r.contractType !== f.ctype)     return false;
       return true;
     });
   }
@@ -1169,21 +1610,20 @@
       if (values.includes(cur)) el.value = cur;
     }
     const sortedAsc  = v => [...new Set(orgs.flatMap(o => v(o)).filter(Boolean))].sort();
-    const sortedDesc = v => [...new Set(orgs.flatMap(o => v(o)).filter(Boolean))].sort().reverse();
 
-    const ymList = sortedDesc(o => o.yearMonths);
-    fill('po-f-yearmonth', ymList);
-
-    // Default to the latest Year/Month if available and not already set
-    if (!poTableFilter.yearMonth && ymList.length > 0) {
-      const ymSelect = document.getElementById('po-f-yearmonth');
-      if (ymSelect) {
-        ymSelect.value = ymList[0];
-        poTableFilter.yearMonth = ymList[0];
-      }
+    // Reporting Month dropdown (table only): last 12 months incl. the current month to date, newest first.
+    // Defaults to the current month; no "All" option because the table needs a single month.
+    const ymEl = document.getElementById('po-f-yearmonth');
+    if (ymEl) {
+      const snapRows = (D.weeklySnapshots[0]?.records) || [];
+      const l12 = [...new Set(snapRows.filter(r => r.isL12Months).map(r => r.yearMonth).filter(Boolean))].sort().reverse();
+      const curYM = poTableFilter.yearMonth;
+      ymEl.innerHTML = '';
+      l12.forEach(ym => ymEl.appendChild(new Option(ym + (ym === curYM ? ' (month to date)' : ''), ym)));
+      ymEl.value = curYM;
     }
 
-    fill('po-f-name',      sortedAsc(o => [o.name]));
+    poNameOptions = sortedAsc(o => [o.name]);
     fill('po-f-vendor',    sortedAsc(o => [o.vendor]));
     fill('po-f-iot',       sortedAsc(o => [o.iot]));
   }
@@ -1194,12 +1634,12 @@
     poFilterBarWired = true;
     const mappings = [
       ['po-f-yearmonth', 'yearMonth'],
-      ['po-f-name',      'name'],
       ['po-f-vendor',    'vendor'],
       ['po-f-type',      'type'],
       ['po-f-iot',       'iot'],
       ['po-f-ctype',     'ctype'],
       ['po-f-status',    'status'],
+      ['po-f-contract',  'contract'],
     ];
     mappings.forEach(([id, key]) => {
       const el = document.getElementById(id);
@@ -1208,6 +1648,79 @@
         poTableFilter[key] = e.target.value;
         renderMgmtTable(rows);
       });
+    });
+
+    // Name filter: searchable combobox (same behaviour as the Individual Org View org picker).
+    // Click clears the field so typing starts from scratch; the current selection stays as grayed placeholder.
+    const nameInput = document.getElementById('po-f-name');
+    const nameList  = document.getElementById('po-f-name-list');
+    if (!nameInput || !nameList) return;
+    let nameActive = -1;
+    const nameLabel = () => poTableFilter.name || 'All';
+
+    function buildNameList(filter) {
+      const q = (filter || '').toLowerCase();
+      const matches = q ? poNameOptions.filter(n => n.toLowerCase().includes(q)) : ['', ...poNameOptions];
+      nameList.innerHTML = '';
+      nameActive = -1;
+      if (matches.length === 0) {
+        nameList.innerHTML = '<div class="iov-combo-empty">No results</div>';
+        return;
+      }
+      matches.forEach(name => {
+        const div = document.createElement('div');
+        div.className = 'iov-combo-option' + (name === poTableFilter.name ? ' selected' : '');
+        div.textContent = name || 'All';
+        div.dataset.val = name;
+        div.addEventListener('mousedown', e => {
+          e.preventDefault(); // keep focus on input
+          pickName(name);
+        });
+        nameList.appendChild(div);
+      });
+    }
+
+    function pickName(name) {
+      poTableFilter.name = name;
+      nameInput.value = nameLabel();
+      nameList.classList.remove('open');
+      renderMgmtTable(rows);
+      nameInput.blur(); // so the next click re-triggers focus (starts empty)
+    }
+
+    nameInput.addEventListener('focus', () => {
+      nameInput.value = '';
+      nameInput.placeholder = nameLabel();
+      buildNameList('');
+      nameList.classList.add('open');
+    });
+    nameInput.addEventListener('input', () => {
+      buildNameList(nameInput.value);
+      nameList.classList.add('open');
+    });
+    nameInput.addEventListener('blur', () => {
+      nameList.classList.remove('open');
+      nameInput.value = nameLabel();
+    });
+    nameInput.addEventListener('keydown', e => {
+      const items = nameList.querySelectorAll('.iov-combo-option');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        nameActive = Math.min(nameActive + 1, items.length - 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        nameActive = Math.max(nameActive - 1, 0);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (nameActive >= 0 && items[nameActive]) pickName(items[nameActive].dataset.val);
+        else if (items.length === 1 && items[0].dataset.val !== undefined) pickName(items[0].dataset.val);
+        return;
+      } else if (e.key === 'Escape') {
+        nameInput.blur();
+        return;
+      } else { return; }
+      items.forEach((el, i) => el.classList.toggle('active', i === nameActive));
+      if (items[nameActive]) items[nameActive].scrollIntoView({ block: 'nearest' });
     });
   }
 
@@ -1219,13 +1732,11 @@
     poFilteredOrgs = orgs;
 
     // Re-render KPIs and charts with the filtered row set so they stay in sync.
-    // filteredRows     — all filters applied (used for count KPIs and charts).
-    // filteredRowsNoYM — all filters except yearMonth (used for Total CSUM KPIs,
-    //                    which are inherently time-bounded by isLatestMonth / isL12Months).
-    const filteredRows     = applyPoRowFilter(rows);
-    const filteredRowsNoYM = applyPoRowFilterNoYM(rows);
-    renderKPIs(filteredRows, filteredRowsNoYM);
-    renderCharts(filteredRows);
+    // filteredRows — all active filters applied (drives count KPIs and charts).
+    // CSUM KPIs inside renderKPIs always recompute from the full snapshot (no YM filter).
+    const filteredRows = applyPoRowFilter(rows);
+    renderKPIs(filteredRows);
+    renderCharts(applyPoRowFilter(rows, true));  // charts ignore Year/Month (L12 trends)
     // Sort
     orgs.sort((a, b) => {
       const va = a[poMgmtSort.col], vb = b[poMgmtSort.col];
@@ -1235,6 +1746,16 @@
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * poMgmtSort.dir;
       return String(va).localeCompare(String(vb)) * poMgmtSort.dir;
     });
+
+    // Note under the table title when a past month is selected: Status / Utilization % use today's contract state.
+    const pastNote = document.getElementById('po-past-month-note');
+    if (pastNote) {
+      const curYM = (D.weeklySnapshots[0]?.records.find(r => r.isCurrentMonth)?.yearMonth) || '';
+      const isPast = poTableFilter.yearMonth && poTableFilter.yearMonth !== curYM;
+      pastNote.style.display = isPast ? '' : 'none';
+      if (isPast) document.getElementById('po-past-month-note-text').textContent =
+        'Showing ' + fmtYMLabel(poTableFilter.yearMonth) + '. CSUM and End Consumers are for that month; Status, Utilization % and Tenure reflect today\u2019s contract state.';
+    }
 
     // Filter info
     const infoEl = document.getElementById('po-filter-info');
@@ -1247,6 +1768,8 @@
     MGMT_COLS.forEach(c => {
       const th = document.createElement('th');
       th.innerHTML = c.label.replace(/\n/g,'<br>');
+      const infoBtn = lmInfoButton(c);
+      if (infoBtn) th.appendChild(infoBtn);
       if (c.key === poMgmtSort.col) th.classList.add(poMgmtSort.dir === 1 ? 'asc' : 'desc');
       th.addEventListener('click', () => {
         if (poMgmtSort.col === c.key) poMgmtSort.dir *= -1;
@@ -1311,12 +1834,75 @@
     if (el) CHARTS[id] = new Chart(el, cfg);
   }
 
+  // Program Overview chart helpers ------------------------------------------------------------
+  // An org runs one contract at a time, so a usage line (org + month + end consumer + vendor +
+  // amount) that shows up under two overlapping contracts (renewal month) is counted once, for the
+  // contract with the later start date. Same rule as the CSUM dedup in buildMgmtOrgs().
+  function dedupeCsumLines(rows) {
+    const key = r => (r.name || r.managementOrgName || '') + '|' + (r.yearMonth || '') + '|'
+      + (r.endConsumerName || '') + '|' + (r.vendor || '') + '|' + String(r.configuredCSum ?? '');
+    const latestStart = new Map();
+    rows.forEach(r => {
+      const k = key(r), c = r.contractStart || '';
+      if (!latestStart.has(k) || c > latestStart.get(k)) latestStart.set(k, c);
+    });
+    return rows.filter(r => (r.contractStart || '') === latestStart.get(key(r)));
+  }
+
+  // Commit per month for contracts of one type ('Monthly' | 'Annual'). One commit per contract
+  // (org + start + end), counted in every month the contract is active by its dates, whether or not
+  // it has usage rows that month. If an org has two contracts touching the same month, only the one
+  // with the later start counts (an org never runs two at once).
+  function commitByMonth(allRows, months, type) {
+    const contracts = new Map();
+    allRows.forEach(r => {
+      if (!r.contractStart || !r.contractEnd) return;
+      const org = r.name || r.managementOrgName || '';
+      const k = org + '|' + r.contractStart + '|' + r.contractEnd;
+      let c = contracts.get(k);
+      if (!c) { c = { org, start: r.contractStart, end: r.contractEnd, type: r.contractType, commit: 0 }; contracts.set(k, c); }
+      c.commit = Math.max(c.commit, r.committedAmount || 0);
+    });
+    const byOrg = new Map();
+    contracts.forEach(c => {
+      if (!byOrg.has(c.org)) byOrg.set(c.org, []);
+      byOrg.get(c.org).push(c);
+    });
+    return months.map(ym => {
+      const monthStart = ym + '-01', monthEnd = ym + '-31';
+      let total = 0;
+      byOrg.forEach(list => {
+        let cur = null;
+        list.forEach(c => {
+          if (c.start <= monthEnd && c.end >= monthStart && (!cur || c.start > cur.start)) cur = c;
+        });
+        if (cur && cur.type === type) total += cur.commit;
+      });
+      return total;
+    });
+  }
+
+  // Fills the "last 12 months" note with the window flagged at build time.
+  function updateL12Note() {
+    const el = document.getElementById('po-l12-note-text');
+    if (!el) return;
+    const recs = D.weeklySnapshots[0]?.records ?? [];
+    const yms = [...new Set(recs.filter(r => r.isL12Months === true).map(r => r.yearMonth))].filter(Boolean).sort();
+    if (!yms.length) return;
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const lbl = ym => { const [y, m] = ym.split('-'); return mo[parseInt(m, 10) - 1] + ' ' + y; };
+    el.textContent = `All charts below show the last 12 months (${lbl(yms[0])} – ${lbl(yms[yms.length - 1])}), including the current month to date.`;
+  }
+
   function renderCharts(rows) {
+    updateL12Note();
+    // Last-12-months usage rows with duplicate lines from overlapping contracts removed (see dedupeCsumLines).
+    const l12Dedup = dedupeCsumLines(rows.filter(r => r.isL12Months === true));
     // 1. Annual CSUM Trending — L12 Months + Annual contracts
-    //    Committed Amount: per-month (deduped by SO)
+    //    Committed Amount: per-month, one commit per Annual contract active in the month (commitByMonth)
     //    Configured CSUM: CUMULATIVE running total
     (function buildCsumTrendChart() {
-      const trendRows = rows.filter(r => r.isL12Months === true && r.contractType === 'Annual');
+      const trendRows = l12Dedup.filter(r => r.contractType === 'Annual');
       const trendMonths = [...new Set(trendRows.map(r => r.yearMonth))].filter(Boolean).sort();
       const moNames = ['January','February','March','April','May','June',
                        'July','August','September','October','November','December'];
@@ -1332,16 +1918,9 @@
         return running;
       });
 
-      // Committed Amount — deduplicate by salesOrderNum per month
-      const committedData = trendMonths.map(ym => {
-        const seen = {};
-        trendRows.filter(r => r.yearMonth === ym).forEach(r => {
-          if (r.salesOrderNum == null) return;
-          const k = String(r.salesOrderNum);
-          if (!(k in seen)) seen[k] = r.committedAmount || 0;
-        });
-        return Object.values(seen).reduce((s, v) => s + v, 0);
-      });
+      // Committed Amount — one commit per Annual contract active in each month (not per sales order,
+      // which most rows do not have)
+      const committedData = commitByMonth(rows, trendMonths, 'Annual');
 
       // Sparse label plugin — labels ~4 evenly-spaced non-edge points on each dataset
       const sparseLabelPlugin = {
@@ -1389,8 +1968,8 @@
             {
               label: 'Total Configured CSUM',
               data: csumData,
-              borderColor: '#4589ff',
-              backgroundColor: 'rgba(69,137,255,0.07)',
+              borderColor: '#42be65',
+              backgroundColor: 'rgba(66,190,101,0.07)',
               borderWidth: 2.5,
               pointRadius: 3,
               pointHoverRadius: 6,
@@ -1422,6 +2001,96 @@
           }
         },
         plugins: [sparseLabelPlugin],
+      });
+    })();
+
+    // 1b. Total End Consumers — monthly active distinct count per month (matches the KPI card basis):
+    //     For each month in L12, counts unique end consumers active on live contracts in that month.
+    //     Lines: Total (distinct across MSP + CCB), MSP, CCB. Driven by the same filtered rows as the other charts.
+    (function buildEcCountChart() {
+      const ecMonths = [...new Set(rows.filter(r => r.isL12Months === true).map(r => r.yearMonth))].filter(Boolean).sort();
+      const moNames = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December'];
+      const ecLabels = ecMonths.map(ym => {
+        const [y, m] = String(ym).split('-');
+        return (moNames[parseInt(m,10)-1] || m) + ' ' + y;
+      });
+
+      const snapDate = D.weeklySnapshots?.[0]?.snapshotDate || '';
+      const isActiveRow = r => {
+        if (r.contractStatus) return r.contractStatus === 'ACTIVE';
+        return r.contractStart <= snapDate && r.contractEnd >= snapDate;
+      };
+
+      const countInMonth = (type) => ecMonths.map(ym => {
+        const set = new Set();
+        rows.filter(r => r.yearMonth === ym && isActiveRow(r) && (!type || r.type === type)).forEach(r => {
+          const ec = r.endConsumerName || r.endConsumerName2;
+          if (ec && String(ec).trim()) set.add(ec);
+        });
+        return set.size;
+      });
+
+      const hexA = (hex, a) => {
+        const n = parseInt(hex.slice(1), 16);
+        return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+      };
+
+      const series = [
+        { label: 'Total End Consumers', data: countInMonth(null),  color: '#a56eff', width: 3.5, alpha: 1 },
+        { label: 'MSP',                 data: countInMonth('MSP'), color: '#4589ff', width: 1.5, alpha: 0.7 },
+        { label: 'CCB',                 data: countInMonth('CCB'), color: '#f1c21b', width: 1.5, alpha: 0.7 },
+      ];
+      const labelPlugin = {
+        id: 'ecCountLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data } = chart;
+          ctx.save();
+          ctx.font = 'bold 10px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          data.datasets.forEach((ds, di) => {
+            const n = ds.data.length;
+            if (n < 1) return;
+            const idx = new Set(n <= 1 ? [0] : [0, Math.round(n * 0.33), Math.round(n * 0.66), n - 1]);
+            chart.getDatasetMeta(di).data.forEach((pt, i) => {
+              if (!idx.has(i) || ds.data[i] == null) return;
+              ctx.fillStyle = ds.borderColor;
+              ctx.fillText(String(ds.data[i]), pt.x, pt.y - 6);
+            });
+          });
+          ctx.restore();
+        }
+      };
+      makeChart('chart-ec-count', {
+        type: 'line',
+        data: {
+          labels: ecLabels,
+          datasets: series.map(s => ({
+            label: s.label,
+            data: s.data,
+            borderColor: hexA(s.color, s.alpha),
+            backgroundColor: hexA(s.color, s.alpha),
+            borderWidth: s.width,
+            pointRadius: s.alpha === 1 ? 4 : 2.5,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: false,
+          }))
+        },
+        options: {
+          responsive: true,
+          layout: { padding: { top: 20 } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + c.parsed.y } }
+          },
+          scales: {
+            x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        },
+        plugins: [labelPlugin],
       });
     })();
 
@@ -1493,7 +2162,7 @@
 
     // 2. Configured CSUM — MSP vs CCB by Month — L12, grouped double bar, x = YYYY-MM
     (function buildMspCcbChart() {
-      const l12Rows = rows.filter(r => r.isL12Months === true);
+      const l12Rows = l12Dedup;
       const l12Months = [...new Set(l12Rows.map(r => r.yearMonth))].filter(Boolean).sort();
       makeChart('chart-type-month', {
         type: 'bar',
@@ -1521,7 +2190,7 @@
         options: {
           responsive: true,
           plugins: {
-            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 12 } } },
+            legend: { display: false },
             tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtV(c.parsed.y) } }
           },
           scales: {
@@ -1534,9 +2203,9 @@
     })();
 
     // 3. Configured CSUM by vendor — L12 months only, consistent with MSP vs CCB chart
-    const vcRows = rows.filter(r => r.isL12Months === true);
+    const vcRows = l12Dedup;
     const vcGrp = groupBy(vcRows, 'vendor');
-    const vcLbls = Object.keys(vcGrp).filter(k => k && k !== '(blank)' && sum(vcGrp[k], 'configuredCSum') > 0).sort((a, b) => sum(vcGrp[b], 'configuredCSum') - sum(vcGrp[a], 'configuredCSum'));
+    const vcLbls = Object.keys(vcGrp).filter(k => k && k !== '(blank)' && sum(vcGrp[k], 'configuredCSum') >= 0.5).sort((a, b) => sum(vcGrp[b], 'configuredCSum') - sum(vcGrp[a], 'configuredCSum'));
     makeChart('chart-vendor-cost', {
       type: 'bar',
       data: { labels: vcLbls, datasets: [{ label: 'Configured CSUM', data: vcLbls.map(k => sum(vcGrp[k], 'configuredCSum')), backgroundColor: vcLbls.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 2, barPercentage: 0.6, categoryPercentage: 0.8 }] },
@@ -1553,9 +2222,7 @@
 
     function buildCsumChart(sourceRows) {
       // Always Monthly — last 12 months, grouped by YYYY-MM
-      const filtered = sourceRows.filter(r =>
-        r.isL12Months === true && r.contractType === 'Monthly'
-      );
+      const filtered = l12Dedup.filter(r => r.contractType === 'Monthly');
       const csumMonths = [...new Set(filtered.map(r => r.yearMonth))].filter(Boolean).sort();
       const csumLabels = csumMonths.map(ym => {
         const [y, m] = String(ym).split('-');
@@ -1565,16 +2232,8 @@
       const csumData = csumMonths.map(ym =>
         sum(filtered.filter(r => r.yearMonth === ym), 'configuredCSum')
       );
-      // committedAmount: deduplicate by salesOrderNum per month
-      const committedData = csumMonths.map(ym => {
-        const monthRows = filtered.filter(r => r.yearMonth === ym);
-        const seen = {};
-        monthRows.forEach(r => {
-          const k = String(r.salesOrderNum);
-          if (!(k in seen)) seen[k] = r.committedAmount || 0;
-        });
-        return Object.values(seen).reduce((s, v) => s + v, 0);
-      });
+      // committedAmount: one commit per Monthly contract active in each month (commitByMonth)
+      const committedData = commitByMonth(sourceRows, csumMonths, 'Monthly');
 
       // Inline plugin: draw value label above each bar
       const csumBarLabelsPlugin = {
@@ -1603,7 +2262,7 @@
         data: {
           labels: csumLabels,
           datasets: [
-            { label: 'Total Configured CSUM', data: csumData,      backgroundColor: '#4589ff' },
+            { label: 'Total Configured CSUM', data: csumData,      backgroundColor: '#42be65' },
             { label: 'Monthly Commit',         data: committedData, backgroundColor: '#ff832b' },
           ]
         },
@@ -1611,7 +2270,7 @@
           responsive: true,
           layout: { padding: { top: 28 } },
           plugins: {
-            legend: { position: 'bottom' },
+            legend: { display: false },
             tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtV(c.parsed.y) } }
           },
           scales: {
@@ -1644,11 +2303,23 @@
   let iovCurrentOrg = '';
 
   // ── Slider state ─────────────────────────────────────────────────────────
-  // iovAllMonths: sorted array of all YYYY-MM strings across the whole dataset
+  // iovAllMonths: sorted array of YYYY-MM strings for currently selected org
   // iovSliderStart/End: indices into iovAllMonths currently selected
   let iovAllMonths  = [];
   let iovSliderStart = 0;
   let iovSliderEnd   = 0;
+  let iovAllDatasetMonths = [];
+  let iovDxcRegion = 'ALL';
+  let iovResetSliderForOrg = () => {};
+
+  function iovResetDxcRegionUI() {
+    iovDxcRegion = 'ALL';
+    const dxcBtns = document.querySelectorAll('.iov-dxc-btn');
+    dxcBtns.forEach(b => {
+      if (b.dataset.region === 'ALL') b.classList.add('active');
+      else b.classList.remove('active');
+    });
+  }
 
   function iovInit() {
     if (iovInitialized) return;
@@ -1665,15 +2336,10 @@
     iovAllOrgs = [...orgSet].sort();
 
     // ── Timeframe slider setup ────────────────────────────────────────────────
-    // Build the full sorted list of all months in the dataset (not just L12)
+    // Build the full sorted list of all months in the dataset
     const allMonthsSet = new Set();
     snap.forEach(r => { if (r.yearMonth) allMonthsSet.add(r.yearMonth); });
-    iovAllMonths = [...allMonthsSet].sort();
-    const maxIdx = iovAllMonths.length - 1;
-
-    // Default: show last 12 months (or all if fewer than 12)
-    iovSliderStart = Math.max(0, maxIdx - 11);
-    iovSliderEnd   = maxIdx;
+    iovAllDatasetMonths = [...allMonthsSet].sort();
 
     const elStart  = document.getElementById('iov-range-start');
     const elEnd    = document.getElementById('iov-range-end');
@@ -1691,6 +2357,7 @@
 
     function updateSliderUI() {
       if (!elStart) return;
+      const maxIdx = Math.max(0, iovAllMonths.length - 1);
       elStart.min = 0; elStart.max = maxIdx; elStart.value = iovSliderStart;
       elEnd.min   = 0; elEnd.max   = maxIdx; elEnd.value   = iovSliderEnd;
       // Fill bar between thumbs
@@ -1701,10 +2368,44 @@
       // Labels
       const sLbl = iovSliderMonthLabel(iovAllMonths[iovSliderStart]);
       const eLbl = iovSliderMonthLabel(iovAllMonths[iovSliderEnd]);
-      if (elLbl)  elLbl.textContent  = sLbl + ' - ' + eLbl;
-      if (elLblS) elLblS.textContent = sLbl;
-      if (elLblE) elLblE.textContent = eLbl;
+      const minLbl = iovSliderMonthLabel(iovAllMonths[0]);
+      const maxLbl = iovSliderMonthLabel(iovAllMonths[maxIdx]);
+      if (elLbl)  elLbl.textContent  = sLbl + (sLbl !== eLbl ? ' - ' + eLbl : '');
+      if (elLblS) elLblS.textContent = minLbl;
+      if (elLblE) elLblE.textContent = maxLbl;
     }
+
+    function computeOrgMonths(orgName) {
+      const orgRows = snap.filter(r => (r.name || r.managementOrgName) === orgName);
+      const starts = orgRows.map(r => r.contractStart).filter(Boolean).map(s => s.slice(0, 7)).sort();
+      const ends   = orgRows.map(r => r.contractEnd).filter(Boolean).map(s => s.slice(0, 7)).sort();
+
+      let startYM = starts[0];
+      let endYM   = ends[ends.length - 1];
+
+      if (!startYM || !endYM) {
+        const yms = [...new Set(orgRows.map(r => r.yearMonth).filter(Boolean))].sort();
+        startYM = startYM || yms[0] || iovAllDatasetMonths[0];
+        endYM   = endYM   || yms[yms.length - 1] || iovAllDatasetMonths[iovAllDatasetMonths.length - 1];
+      }
+
+      const datasetMin = iovAllDatasetMonths[0] || '';
+      const datasetMax = iovAllDatasetMonths[iovAllDatasetMonths.length - 1] || '';
+
+      if (datasetMin && startYM < datasetMin) startYM = datasetMin;
+      if (datasetMax && endYM > datasetMax)   endYM   = datasetMax;
+      if (startYM > endYM) startYM = endYM;
+
+      const matched = iovAllDatasetMonths.filter(ym => ym >= startYM && ym <= endYM);
+      return matched.length > 0 ? matched : (iovAllDatasetMonths.length > 0 ? [iovAllDatasetMonths[iovAllDatasetMonths.length - 1]] : []);
+    }
+
+    iovResetSliderForOrg = function(orgName) {
+      iovAllMonths = computeOrgMonths(orgName);
+      iovSliderStart = 0;
+      iovSliderEnd   = Math.max(0, iovAllMonths.length - 1);
+      updateSliderUI();
+    };
 
     if (elStart && elEnd) {
       elStart.addEventListener('input', () => {
@@ -1724,8 +2425,6 @@
         iovRender();
       });
     }
-
-    updateSliderUI();
 
     // ── Searchable combobox ──────────────────────────────────────────────────
     const comboInput = document.getElementById('iov-combo-input');
@@ -1756,15 +2455,34 @@
       });
     }
 
+    // ── DXC Region Selector buttons ──────────────────────────────────────────
+    const dxcBtns = document.querySelectorAll('.iov-dxc-btn');
+    dxcBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        dxcBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        iovDxcRegion = btn.dataset.region || 'ALL';
+        iovRender();
+      });
+    });
+
+    const comboPlaceholder = comboInput.placeholder;
+
     function pickOrg(name) {
       iovCurrentOrg = name;
       comboInput.value = name;
       comboList.classList.remove('open');
+      iovResetDxcRegionUI();
+      iovResetSliderForOrg(name);
       iovRender();
+      comboInput.blur(); // so the next click re-triggers focus (starts empty)
     }
 
     comboInput.addEventListener('focus', () => {
-      buildComboList(comboInput.value === iovCurrentOrg ? '' : comboInput.value);
+      // Start typing from scratch; show current org as grayed placeholder
+      comboInput.value = '';
+      if (iovCurrentOrg) comboInput.placeholder = iovCurrentOrg;
+      buildComboList('');
       comboList.classList.add('open');
     });
 
@@ -1774,6 +2492,7 @@
     });
 
     comboInput.addEventListener('blur', () => {
+      comboInput.placeholder = comboPlaceholder;
       setTimeout(() => {
         comboList.classList.remove('open');
         if (!iovCurrentOrg || !iovAllOrgs.includes(comboInput.value)) {
@@ -1801,15 +2520,17 @@
       } else if (e.key === 'Escape') {
         comboInput.value = iovCurrentOrg || '';
         comboList.classList.remove('open');
+        comboInput.blur();
         return;
       } else { return; }
       items.forEach((el, i) => el.classList.toggle('active', i === comboActive));
       if (items[comboActive]) items[comboActive].scrollIntoView({ block: 'nearest' });
     });
 
-    // Auto-select the first org
+    // Auto-select DXC Technology (first match), falling back to the first org alphabetically
     if (iovAllOrgs.length > 0) {
-      pickOrg(iovAllOrgs[0]);
+      const defaultOrg = iovAllOrgs.find(n => n.startsWith('DXC Technology')) || iovAllOrgs[0];
+      pickOrg(defaultOrg);
     }
 
     // ── Export PDF button ─────────────────────────────────────────────────
@@ -1892,6 +2613,7 @@
           useCORS: true,
           backgroundColor: '#ffffff',
           logging: false,
+          ignoreElements: node => node.classList && node.classList.contains('lm-info-btn'),   // no (i) icons in the PDF
           windowWidth: el.scrollWidth,
           windowHeight: el.scrollHeight,
         });
@@ -1979,6 +2701,7 @@
       const csumBox = document.getElementById('iov-csum-chart')?.closest('.chart-box');
       await addElement(csumBox, { scale: 2 });
 
+
       // ── Charts 2+3: End Consumers + CSUM by End Consumer ───────────────
       if (overlayMsg) overlayMsg.textContent = 'Capturing charts (2–3/5)…';
       const chartsRow1 = document.querySelectorAll('#tab-individual-org .charts-row')[0];
@@ -2035,6 +2758,8 @@
     const comboInput = document.getElementById('iov-combo-input');
     comboInput.value = orgName;
     iovCurrentOrg = orgName;
+    iovResetDxcRegionUI();
+    iovResetSliderForOrg(orgName);
     iovRender();
   }
 
@@ -2082,6 +2807,8 @@
         } else {
           th.innerHTML = c.label.replace(/\n/g,'<br>');
         }
+        const infoBtn = lmInfoButton(c);
+        if (infoBtn) th.appendChild(infoBtn);
         hdrTr.appendChild(th);
       });
       iovThead.appendChild(hdrTr);
@@ -2116,15 +2843,31 @@
       });
     }
 
-    // Filter to slider-selected window, intersected with isL12Months.
+    // ── DXC Region Bar visibility & chart rows filtering ────────────────────
+    const isDxcOrg = (iovCurrentOrg || '').includes('DXC');
+    const elDxcBar = document.getElementById('iov-dxc-region-bar');
+    if (elDxcBar) {
+      elDxcBar.style.display = isDxcOrg ? 'flex' : 'none';
+    }
+
+    let chartOrgRows = orgRows;
+    if (isDxcOrg && iovDxcRegion !== 'ALL') {
+      chartOrgRows = orgRows.filter(r => {
+        if (iovDxcRegion === 'US') return r.region === 'US' || r.managementOrgName === 'dxc-msp.com';
+        if (iovDxcRegion === 'EU') return r.region === 'EU' || r.managementOrgName === 'dxc-msp-eu.com';
+        if (iovDxcRegion === 'AU') return r.region === 'AU' || r.managementOrgName === 'dxc-msp-au.com';
+        return true;
+      });
+    }
+
+    // Filter to slider-selected window.
     // Deduplicate across contracts: keep one row per endConsumer|yearMonth|vendor|configuredCSum,
     // preferring the row with the latest contractStart (newer contract wins).
     const sliderMin = iovAllMonths[iovSliderStart] || '';
     const sliderMax = iovAllMonths[iovSliderEnd]   || '';
 
     const l12Rows = (function() {
-      const raw = orgRows.filter(r =>
-        r.isL12Months === true &&
+      const raw = chartOrgRows.filter(r =>
         (r.yearMonth || '') >= sliderMin &&
         (r.yearMonth || '') <= sliderMax
       );
@@ -2237,7 +2980,7 @@
           },
           layout: { padding: { top: 24 } },
           scales: {
-            x: { stacked: true, ticks: { maxRotation: 45, font: { size: 11 } } },
+            x: { stacked: true, ticks: { autoSkip: false, maxRotation: 45, font: { size: 10 } } },
             y: {
               stacked: true,
               ticks: { callback: v => fmtM(v) }
@@ -2249,20 +2992,18 @@
     }
 
     // ── 2. End Consumers Trending — Line Chart
-    //    Cumulative distinct count: for each month, count unique consumers seen
-    //    in ALL months up to and including that month (mirrors the DAX CALCULATE +
-    //    FILTER(ALLSELECTED … <= MAX(Year_Month)) pattern).
+    //    Monthly active distinct count: for each month in the selected window,
+    //    count unique end consumers active in that month (matches the End Consumers table column).
     destroyChart('iov-ec-trend');
     const elEc = document.getElementById('iov-chart-ec-trend');
     if (elEc && l12Months.length > 0) {
-      const cumulativeSet = new Set();
       const ecCounts = l12Months.map(ym => {
-        // All rows for this org up to and including this month (use full orgRows, not just l12)
-        orgRows.filter(r => r.yearMonth <= ym).forEach(r => {
+        const monthSet = new Set();
+        chartOrgRows.filter(r => r.yearMonth === ym).forEach(r => {
           const ec = r.endConsumerName || r.endConsumerName2;
-          if (ec && String(ec).trim()) cumulativeSet.add(ec);
+          if (ec && String(ec).trim()) monthSet.add(ec);
         });
-        return cumulativeSet.size;
+        return monthSet.size;
       });
 
       // Sparse labels: pick ~4 evenly-spaced interior indices
@@ -2317,7 +3058,7 @@
             tooltip: { callbacks: { label: c => ' Count: ' + c.parsed.y } }
           },
           scales: {
-            x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+            x: { ticks: { autoSkip: true, maxRotation: 45, font: { size: 10 } } },
             y: {
               beginAtZero: true,
               ticks: { precision: 0 }
@@ -2403,10 +3144,11 @@
       });
     }
 
-    // ── 4. CSUM Trending by Commit — Line Chart ─────────────────────────────
+    // ── 4. CSUM Trending by Commit — Bar (Monthly) / Line (Annual) ──────────
     // Derive contract type from this org's data to label the commit line correctly
     const iovContractType = (orgs.length > 0 && orgs[0].contractType) || 'Monthly';
     const iovCommitLabel  = iovContractType === 'Annual' ? 'Annual Commit' : 'Monthly Commit';
+    const iovCommitIsBar  = iovContractType !== 'Annual'; // Monthly standard = grouped bars (as in Program Overview)
     const iovCommitTitle  = document.getElementById('iov-csum-committed-title');
     const iovCommitLegend = document.getElementById('iov-csum-commit-legend-label');
     if (iovCommitTitle)  iovCommitTitle.textContent = `CSUM Trending by ${iovCommitLabel}`;
@@ -2415,6 +3157,11 @@
       const legendNodes = iovCommitLegend.childNodes;
       legendNodes[legendNodes.length - 1].textContent = iovCommitLabel;
     }
+    // Legend swatches: square for bars, thin line for line chart
+    document.querySelectorAll('#iov-csum-committed-title ~ div > span > span').forEach(sw => {
+      sw.style.height = iovCommitIsBar ? '10px' : '3px';
+      sw.style.width  = iovCommitIsBar ? '10px' : '24px';
+    });
 
     destroyChart('iov-csum-committed');
     const elCsumCommitted = document.getElementById('iov-chart-csum-committed');
@@ -2424,6 +3171,8 @@
         running += sum(l12Rows.filter(r => r.yearMonth === ym), 'configuredCSum');
         return running;
       });
+      // Per-month CSUM (used by the Monthly bar chart)
+      const csumMonthly = l12Months.map(ym => sum(l12Rows.filter(r => r.yearMonth === ym), 'configuredCSum'));
 
       // Committed amount per month: sum the max committed value per sales order
       // across ALL orgRows (not just deduplicated l12Rows), but only for contracts
@@ -2455,46 +3204,51 @@
       const COMMITTED_COLOR = '#ff832b';
       const CSUM_COLOR      = '#42be65';
 
+      // Bar labels: show on every bar when there is room, otherwise only the sparse set
+      const ccBarLabelIdx = ccLen <= 6 ? null : ccLabelIdx;
+
       const csumCommittedLabelsPlugin = {
         id: 'csumCommittedLabels',
         afterDatasetsDraw(chart) {
-          const { ctx, data, scales: { x, y } } = chart;
+          const { ctx, data } = chart;
           ctx.save();
-          ctx.font = 'bold 11px IBM Plex Sans, Segoe UI, system-ui, sans-serif';
+          ctx.font = (iovCommitIsBar ? '10px' : 'bold 11px') + ' IBM Plex Sans, Segoe UI, system-ui, sans-serif';
           ctx.textBaseline = 'bottom';
           const totalPoints = l12Months.length;
           data.datasets.forEach((ds, dsIdx) => {
             const meta = chart.getDatasetMeta(dsIdx);
-            const color = dsIdx === 0 ? COMMITTED_COLOR : CSUM_COLOR;
-            ctx.fillStyle = color;
+            ctx.fillStyle = ds._labelColor;
             meta.data.forEach((pt, i) => {
-              if (!ccLabelIdx.has(i)) return;
+              const allowed = iovCommitIsBar ? (!ccBarLabelIdx || ccBarLabelIdx.has(i)) : ccLabelIdx.has(i);
+              if (!allowed) return;
               const val = ds.data[i];
               if (!val) return;
-              if (i === 0) {
+              if (!iovCommitIsBar && i === 0) {
                 ctx.textAlign = 'left';
-              } else if (i === totalPoints - 1) {
+              } else if (!iovCommitIsBar && i === totalPoints - 1) {
                 ctx.textAlign = 'right';
               } else {
                 ctx.textAlign = 'center';
               }
-              ctx.fillText(fmtM(val), pt.x, pt.y - 7);
+              ctx.fillText(fmtM(val), pt.x, pt.y - (iovCommitIsBar ? 4 : 7));
             });
           });
           ctx.restore();
         }
       };
 
-      CHARTS['iov-csum-committed'] = new Chart(elCsumCommitted, {
-        type: 'line',
-        data: {
-          labels: l12MonthLabels,
-          datasets: [
+      const csumCommittedDatasets = iovCommitIsBar
+        ? [
+            { label: 'Configured CSUM', data: csumMonthly, backgroundColor: CSUM_COLOR, _labelColor: CSUM_COLOR },
+            { label: iovCommitLabel, data: committedPerMonth, backgroundColor: COMMITTED_COLOR, _labelColor: COMMITTED_COLOR },
+          ]
+        : [
             {
               label: iovCommitLabel,
               data: committedPerMonth,
               borderColor: COMMITTED_COLOR,
               backgroundColor: 'rgba(255,131,43,0.08)',
+              _labelColor: COMMITTED_COLOR,
               borderWidth: 2,
               pointRadius: 3,
               pointHoverRadius: 5,
@@ -2506,13 +3260,20 @@
               data: csumAccum,
               borderColor: CSUM_COLOR,
               backgroundColor: 'rgba(66,190,101,0.1)',
+              _labelColor: CSUM_COLOR,
               borderWidth: 2.5,
               pointRadius: 3,
               pointHoverRadius: 5,
               tension: 0.2,
               fill: false,
             },
-          ]
+          ];
+
+      CHARTS['iov-csum-committed'] = new Chart(elCsumCommitted, {
+        type: iovCommitIsBar ? 'bar' : 'line',
+        data: {
+          labels: l12MonthLabels,
+          datasets: csumCommittedDatasets
         },
         options: {
           responsive: true,
@@ -2522,7 +3283,7 @@
             tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmtM(c.parsed.y) } }
           },
           scales: {
-            x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+            x: { ticks: { autoSkip: true, maxRotation: 45, font: { size: 10 } } },
             y: { beginAtZero: true, ticks: { maxTicksLimit: 5, callback: v => fmtM(v) } }
           }
         },
@@ -2532,6 +3293,8 @@
 
     // ── 5. CSUM Trending by Vendor — Stacked Bar ────────────────────────────
     destroyChart('iov-csum-vendor');
+    const elVendorLegendReset = document.getElementById('iov-vendor-legend');
+    if (elVendorLegendReset) elVendorLegendReset.innerHTML = '';
     const elCsumVendor = document.getElementById('iov-chart-csum-vendor');
     if (elCsumVendor && l12Months.length > 0) {
       const vendorSet = [...new Set(l12Rows.map(r => r.vendor).filter(Boolean))].sort();
@@ -2601,6 +3364,21 @@
         }
       };
 
+      // Header legend (top right, same placement as CSUM Trending by Commit)
+      const elVendorLegend = document.getElementById('iov-vendor-legend');
+      if (elVendorLegend) {
+        elVendorLegend.innerHTML = '';
+        vendorDatasets.forEach(ds => {
+          const item = document.createElement('span');
+          item.style.cssText = 'display:flex;align-items:center;gap:5px';
+          const sw = document.createElement('span');
+          sw.style.cssText = 'display:inline-block;width:10px;height:10px;border-radius:2px;background:' + ds.backgroundColor;
+          item.appendChild(sw);
+          item.appendChild(document.createTextNode(ds.label));
+          elVendorLegend.appendChild(item);
+        });
+      }
+
       CHARTS['iov-csum-vendor'] = new Chart(elCsumVendor, {
         type: 'bar',
         data: {
@@ -2611,7 +3389,7 @@
           responsive: true,
           layout: { padding: { top: 24 } },
           plugins: {
-            legend: { position: 'top', align: 'end', labels: { boxWidth: 10, font: { size: 11 } } },
+            legend: { display: false },
             tooltip: {
               callbacks: {
                 label: c => ' ' + c.dataset.label + ': ' + fmtM(c.parsed.y),
@@ -2623,7 +3401,7 @@
             }
           },
           scales: {
-            x: { stacked: true, ticks: { maxRotation: 45, font: { size: 11 } } },
+            x: { stacked: true, ticks: { autoSkip: true, maxRotation: 45, font: { size: 10 } } },
             y: {
               stacked: true,
               ticks: { callback: v => fmtM(v) }

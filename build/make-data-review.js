@@ -3,7 +3,7 @@
  *
  * Usage:  node build/make-data-review.js   (or: npm run review)
  *
- * Columns: Excel source order, then 7 computed fields last.
+ * Columns: Excel source order, then 8 computed fields last.
  * Filters: CUSTOMER_NAME_FULL_MRGD, YEAR_MONTH, VENDOR, Contract Type.
  * Numbers: 2 decimal places throughout.
  * Export:  CSV download button.
@@ -73,6 +73,8 @@ const COLS = [
   { key: 'imt',                   label: 'IMT' },                   // 84
   { key: 'contractStart',         label: 'CONTRACT_START_DATE' },   // 85
   { key: 'contractEnd',           label: 'CONTRACT_END_DATE' },     // 86
+  { key: 'contractStatus',        label: 'CONTRACT_STATUS' },
+  { key: 'sentiment',             label: 'SENTIMENT' },
   { key: 'nextRenewalDate',       label: 'NEXT_RENEWAL_DATE' },     // 89
   { key: 'custNameFullReseller',  label: 'CUST_NAME_FULL_RESELLER' },// 92
   { key: 'product',               label: 'UT_LEVEL_CODE_30_DSCR' }, // 104
@@ -84,6 +86,7 @@ const COLS = [
   { key: 'clientType',            label: 'CLIENT_TYPE' },           // 158
   // ── Computed fields ───────────────────────────────────────────────────────
   { key: 'isLatestMonth',         label: 'Latest Month',          computed: true },
+  { key: 'isCurrentMonth',        label: 'Current Month',         computed: true },
   { key: 'tenureMonths',          label: 'Tenure (Months)',        computed: true },
   { key: 'contractType',          label: 'Contract Type',          computed: true },
   { key: 'configuredCSum',        label: 'Configured CSum',        computed: true, dp:2 },
@@ -125,7 +128,7 @@ const groups = [
   { label: 'Contract',    keys: ['salesOrderNum','soLi','coverageTerm','contractStart','contractEnd','nextRenewalDate','renewalCounter','reportingDate','signingDate'] },
   { label: 'Product',     keys: ['partNum','partDesc','family','product','offeringStatus'] },
   { label: 'Metrics',     keys: ['acvUsd','tcvUsd','acvLocal','tcvLocal','currencyCode','fmsAmount','partQty','usdCost','usdAdjustedCost','country'] },
-  { label: 'Computed ✦',  keys: ['isLatestMonth','tenureMonths','contractType','configuredCSum','committedAmount','isL12Months','endConsumerName2'] },
+  { label: 'Computed ✦',  keys: ['isLatestMonth','isCurrentMonth','tenureMonths','contractType','configuredCSum','committedAmount','isL12Months','endConsumerName2'] },
 ];
 
 // ── Distinct filter values ────────────────────────────────────────────────
@@ -486,4 +489,4 @@ rebuildTable();
 fs.writeFileSync(outputPath, html, 'utf8');
 const kb = (fs.statSync(outputPath).size / 1024).toFixed(0);
 console.log(`Data review written: ${outputPath}`);
-console.log(`Records: ${recs.length} | Columns: ${COLS.length} (7 computed) | Size: ${kb} KB`);
+console.log(`Records: ${recs.length} | Columns: ${COLS.length} (8 computed) | Size: ${kb} KB`);

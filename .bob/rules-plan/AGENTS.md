@@ -15,7 +15,7 @@ This file provides guidance to agents when working with code in this repository.
 
 - **`buildMgmtOrgs(rows, targetYM)` has two call signatures.** The management table passes `poTableFilter.yearMonth`, while the IOV table passes nothing (all rows). The wrong signature gives wrong utilization numbers.
 
-- **Business rules live in the build, not the browser.** `committedAmount` multipliers (including the `DXC Technology*` special case) and the encoding repairs (`MOJIBAKE_FIXES`) are in `build/parse-data.js`. Fix data problems there.
+- **Business rules live in the build, not the browser.** `committedAmount` multipliers (no per-org special cases) and the encoding repairs (`MOJIBAKE_FIXES`) are in `build/parse-data.js`. Fix data problems there.
 
 - **The PDF export is size-sensitive.** Large DXC-type orgs have 100+ end consumers. The PDF caps the end-consumer chart to one page, and images are JPEG at quality 0.6. Any new tall or dense chart needs a similar cap.
 
